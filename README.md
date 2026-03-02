@@ -1,0 +1,228 @@
+# brainrot-dvm
+
+Nostr DVM for video composition: subscribes to job requests (kind 5342), runs ffmpeg to trim/concat segments, then uses replaceable task events (30534) so the client signs NIP-98 (Blossom upload) and the final kind 34236. All over relays, no DMs.
+
+## Quick Start
+
+```bash
+cp .env.example .env
+# Set DVM_SECRET_KEY (hex, 64 chars) and optionally RELAYS
+docker compose up --build
+```
+
+The DVM connects to the relay(s) in `RELAYS` and subscribes to kind 5342. It does not run a relay.
+
+---
+
+## Client Integration
+
+### Job Request Format (kind 5342)
+
+**Simplified payload** (~600 bytes vs ~50KB with full events):
+
+```json
+{
+  "segments": [
+    {
+      "videoUrl": "https://example.com/video.mp4",
+      "startTime": 0,
+      "endTime": 5,
+      "eventId": "abc123...",
+      "authorPubkey": "def456..."
+    }
+  ],
+  "blossom_upload_url": "https://your-blossom-server.com"
+}
+```
+
+**Tags:**
+```typescript
+[
+  ["output", "video/mp4"],
+  ["relays", "wss://relay.damus.io"],
+  ["param", "segments", "1"],
+  ["param", "duration", "5"],
+  ["t", "brainrot"],
+  ["client", "brainrot.rehab"]
+]
+```
+
+### Complete Flow
+
+**1. User creates job request (kind 5342)**
+
+```typescript
+const jobRequest = {
+  kind: 5342,
+  content: JSON.stringify({
+    segments: [...],
+    blossom_upload_url: "https://your-blossom-server.com"
+  }),
+  tags: [...],
+  created_at: Math.floor(Date.now() / 1000)
+}
+const signed = await window.nostr.signEvent(jobRequest)
+await publishToRelay(signed)
+```
+
+**2. Subscribe to task events (kind 30534)**
+
+```typescript
+pool.subscribe(
+  [relay],
+  {
+    kinds: [30534],
+    authors: [DVM_PUBKEY],
+    "#d": [jobRequestId]
+  },
+  {
+    onevent: async (taskEvent) => {
+      const task = JSON.parse(taskEvent.content)
+      
+      if (task.type === 'sign_nip98') {
+        // Sign NIP-98 auth for Blossom upload
+        const nip98 = await window.nostr.signEvent({
+          kind: 27235,
+          content: '',
+          tags: [
+            ["u", task.url],
+            ["method", task.method],
+            ["payload", task.payload_hash]
+          ],
+          created_at: Math.floor(Date.now() / 1000)
+        })
+        
+        // Send back via kind 30535
+        await publishTaskResponse(jobRequestId, nip98)
+        
+      } else if (task.type === 'sign_event') {
+        // Sign final video event
+        const signed = await window.nostr.signEvent(task.event)
+        await publishTaskResponse(jobRequestId, signed)
+        
+      } else if (task.type === 'success') {
+        console.log('Job complete!', task.result_event_id)
+      } else if (task.type === 'error') {
+        console.error('Job failed:', task.message)
+      }
+    }
+  }
+)
+
+async function publishTaskResponse(jobRequestId, signedEvent) {
+  const response = {
+    kind: 30535,
+    content: JSON.stringify(signedEvent),
+    tags: [
+      ["e", jobRequestId],
+      ["p", DVM_PUBKEY]
+    ],
+    created_at: Math.floor(Date.now() / 1000)
+  }
+  await publishToRelay(await window.nostr.signEvent(response))
+}
+```
+
+**3. Track job state**
+
+Kind 30534 is **replaceable** (by `d` tag = job request ID), so query for current state:
+
+```typescript
+const currentTask = await pool.get(
+  [relay],
+  { kinds: [30534], authors: [DVM_PUBKEY], "#d": [jobRequestId] }
+)
+const state = JSON.parse(currentTask.content)
+// state.type: 'sign_nip98' | 'sign_event' | 'success' | 'error'
+```
+
+**Show user's job history:**
+
+```typescript
+// Fetch all job requests user created
+const myJobs = await pool.querySync(
+  [relay],
+  { kinds: [5342], authors: [userPubkey] }
+)
+
+// For each, get current state and result
+for (const job of myJobs) {
+  const task = await pool.get([relay], { kinds: [30534], authors: [DVM_PUBKEY], "#d": [job.id] })
+  const result = await pool.get([relay], { kinds: [6342], "#e": [job.id] })
+  
+  // Show status: pending | awaiting_signature | complete | error
+}
+```
+
+---
+
+## Event Formats
+
+### Kind 5342 – Job request (client → DVM)
+
+**Content:**
+```json
+{
+  "segments": [
+    {
+      "videoUrl": "https://...",
+      "startTime": 0,
+      "endTime": 5,
+      "eventId": "abc...",
+      "authorPubkey": "def..."
+    }
+  ],
+  "blossom_upload_url": "https://..."
+}
+```
+
+**Backward compatible:** Also accepts old format with `originalEvent` containing full Nostr event with `imeta` tags.
+
+### Kind 7000 – Job feedback (DVM → client)
+
+**Tags:** `e` = request id, `p` = customer pubkey, `status` = `processing` | `error`
+
+**Content:** optional message
+
+### Kind 30534 – Replaceable task (DVM → client)
+
+**Tags:** `d` = request id, `p` = customer pubkey
+
+**Content:** JSON:
+- `{"type":"sign_nip98","method":"POST","url":"...","payload_hash":"..."}`
+- `{"type":"sign_event","event":{...}}`
+- `{"type":"success","result_event_id":"..."}`
+- `{"type":"error","message":"..."}`
+
+### Kind 30535 – Task response (client → DVM)
+
+**Tags:** `e` = request id, `p` = DVM pubkey
+
+**Content:** JSON string of signed event (NIP-98 auth or video event)
+
+### Kind 6342 – Job result (DVM → client)
+
+**Tags:** `e`, `p`, `request` = request id, plus `e`/`p` tags for all original video events/authors
+
+**Content:** `{"event_id":"...","url":"..."}`
+
+---
+
+## Configuration
+
+### .env
+
+- **DVM_SECRET_KEY**: hex private key (64 chars). The DVM's pubkey is derived from this.
+- **RELAYS**: optional; comma-separated relay URLs. Defaults to `wss://relay.samt.st`.
+
+### Why does the DVM have its own private key?
+
+The DVM is a Nostr actor. It publishes events (feedback, tasks, results) that must be signed. The DVM never signs as the user; the user signs NIP-98 and the final video event in the client.
+
+---
+
+## Development
+
+- **Auto-reload:** `tsx watch` in docker-compose detects file changes
+- **Logs:** All output is in container stdout (`docker compose logs -f`)
+- **Temp files:** Videos are processed in temp dirs and cleaned up; final output is only on Blossom

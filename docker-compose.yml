@@ -1,0 +1,19 @@
+services:
+  dvm:
+    build: .
+    command: ["./node_modules/.bin/tsx", "watch", "src/index.ts"]
+    environment:
+      - RELAYS=${RELAYS}
+      - DVM_SECRET_KEY=${DVM_SECRET_KEY}
+      - NODE_TLS_REJECT_UNAUTHORIZED=0
+    restart: unless-stopped
+    volumes:
+      - ./src:/app/src
+    networks:
+      - relaykit-proto_default
+    extra_hosts:
+      - "relay.local:host-gateway"
+
+networks:
+  relaykit-proto_default:
+    external: true

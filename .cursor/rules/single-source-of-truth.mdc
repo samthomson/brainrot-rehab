@@ -1,0 +1,11 @@
+---
+description: Never duplicate defaults or config; one source of truth per value
+alwaysApply: true
+---
+
+# Single source of truth
+
+- **Do not duplicate any default or config value.** Every constant, default, or config (URLs, feature flags, limits, etc.) must live in exactly one place in the codebase.
+- Prefer **code** as that place (e.g. a named constant). Env or config files should only override, not re-state the same default.
+- If adding a new default: define it once (typically in the app that uses it), and have docs/env reference it (e.g. "leave unset for default" or "see DEFAULT_X in src/...").
+- When you find the same value in two places, remove the duplicate and keep the single canonical definition.
