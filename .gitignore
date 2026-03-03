@@ -1,5 +1,13 @@
+# Repo-wide (dvm/ and client/)
 .env
+.env.*
+!.env.example
 node_modules/
 dist/
+dist-ssr/
 *.log
+logs/
 .DS_Store
+.idea/
+*.local
+.vercel
