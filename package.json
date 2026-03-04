@@ -1,0 +1,8 @@
+{
+  "name": "brainrot-dvm-monorepo",
+  "private": true,
+  "description": "Root package so the editor has a workspace TypeScript (client + dvm each have their own package.json)",
+  "devDependencies": {
+    "typescript": "^5.5.0"
+  }
+}

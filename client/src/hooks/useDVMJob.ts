@@ -116,9 +116,8 @@ export function useDVMJob(dvmPubkey: string, selectedRelay: string) {
 
       console.log('NIP-98 signed:', nip98Event);
 
-      // Send response back to DVM
-      const relay = nostr.relay(selectedRelay);
-      await relay.event({
+      // Send response back to DVM (30535 envelope must be signed by user so DVM can verify author)
+      const responseEvent = await user.signer.signEvent({
         kind: 30535,
         content: JSON.stringify(nip98Event),
         tags: [
@@ -127,6 +126,8 @@ export function useDVMJob(dvmPubkey: string, selectedRelay: string) {
         ],
         created_at: Math.floor(Date.now() / 1000),
       });
+      const relay = nostr.relay(selectedRelay);
+      await relay.event(responseEvent);
 
       console.log('NIP-98 response sent to DVM');
       setJobState({ status: 'uploading', currentTask: task });
@@ -154,9 +155,8 @@ export function useDVMJob(dvmPubkey: string, selectedRelay: string) {
       const signedVideoEvent = await user.signer.signEvent(task.event);
       console.log('Video event signed:', signedVideoEvent);
 
-      // Send response back to DVM
-      const relay = nostr.relay(selectedRelay);
-      await relay.event({
+      // Send response back to DVM (30535 envelope must be signed by user so DVM can verify author)
+      const responseEvent = await user.signer.signEvent({
         kind: 30535,
         content: JSON.stringify(signedVideoEvent),
         tags: [
@@ -165,6 +165,8 @@ export function useDVMJob(dvmPubkey: string, selectedRelay: string) {
         ],
         created_at: Math.floor(Date.now() / 1000),
       });
+      const relay = nostr.relay(selectedRelay);
+      await relay.event(responseEvent);
 
       console.log('Video event response sent to DVM');
       

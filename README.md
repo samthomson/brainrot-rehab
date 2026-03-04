@@ -24,6 +24,18 @@ Both services auto-reload on file changes via volume mounts.
 
 ---
 
+## Architecture
+
+Client and DVM live in this repo so you can develop them together.
+
+- **Client (React):** User composes a remix by selecting Nostr short-form videos, setting in/out points per segment, and ordering segments. When they hit “Remix”, the client publishes a **job request** (kind 5342) to the relay. The client also **subscribes to task events** (kind 30534) from the DVM and, when the DVM asks for a signature, signs in the browser (NIP-98 for upload, or the final video event) and sends the signed payload back (kind 30535).
+
+- **DVM (Node + ffmpeg):** Subscribes to kind 5342 job requests. For each job it: downloads the segment URLs, trims and concatenates with ffmpeg, then asks the **user** (via 30534) to sign a NIP-98 auth event so it can upload the result to Blossom. After upload it asks the **user** to sign the final **video event** (kind 34236). The DVM then publishes that signed event and the job result (kind 6342). The DVM never signs as the user—all user-facing events are signed in the client.
+
+**Signing back-and-forth:** User signs job request (5342) → DVM processes → DVM publishes task “sign NIP-98” (30534) → client signs NIP-98, publishes response (30535) → DVM uploads to Blossom → DVM publishes task “sign event” (30534) with unsigned 34236 → client signs video event, publishes response (30535) → DVM publishes signed 34236 and success/result.
+
+---
+
 ## Client Integration
 
 ### Job Request Format (kind 5342)
