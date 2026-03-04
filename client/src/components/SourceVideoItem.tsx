@@ -41,9 +41,17 @@ export function SourceVideoItem({
     if (videoRef.current) {
       const duration = videoRef.current.duration;
       setVideoDuration(duration);
-      setRange([0, duration]);
+      // Keep persisted trim when we have initial range from parent; only default to full when new
+      if (initialStartTime !== undefined && initialEndTime !== undefined) {
+        setRange([
+          Math.min(initialStartTime, duration),
+          Math.min(initialEndTime, duration),
+        ]);
+      } else {
+        setRange([0, duration]);
+      }
     }
-  }, []);
+  }, [initialStartTime, initialEndTime]);
 
   const handleTimeUpdate = useCallback(() => {
     if (videoRef.current) {
