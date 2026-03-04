@@ -13,14 +13,19 @@ interface TimelineTrackProps {
 
 export function TimelineTrack({ segments, sourceVideos, onReorder, onRemove }: TimelineTrackProps) {
   const [thumbnails, setThumbnails] = useState<Record<string, string>>({});
-  
-  // Generate thumbnails for each segment (optimized with cleanup)
+
+  // Cache key includes time range so trimming a segment regenerates its thumbnail
+  const thumbnailKey = (segment: TimelineSegment) =>
+    `${segment.id}-${segment.startTime}-${segment.endTime}`;
+
+  // Generate thumbnails for each segment (frame from within the cut range)
   useEffect(() => {
     const videoElements: HTMLVideoElement[] = [];
 
     segments.forEach((segment) => {
-      if (thumbnails[segment.id]) return;
-      
+      const key = thumbnailKey(segment);
+      if (thumbnails[key]) return;
+
       const sourceVideo = sourceVideos.find((v) => v.id === segment.sourceVideoId);
       if (!sourceVideo) return;
 
@@ -33,7 +38,7 @@ export function TimelineTrack({ segments, sourceVideos, onReorder, onRemove }: T
 
       const generateThumbnail = () => {
         try {
-          const seekTime = segment.startTime + (segment.duration / 2);
+          const seekTime = segment.startTime + segment.duration / 2;
           video.currentTime = seekTime;
         } catch (error) {
           console.error('Error seeking for thumbnail:', error);
@@ -49,12 +54,11 @@ export function TimelineTrack({ segments, sourceVideos, onReorder, onRemove }: T
           if (ctx) {
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
             const thumbnail = canvas.toDataURL('image/jpeg', 0.5);
-            setThumbnails((prev) => ({ ...prev, [segment.id]: thumbnail }));
+            setThumbnails((prev) => ({ ...prev, [key]: thumbnail }));
           }
         } catch (error) {
           console.error('Error generating thumbnail:', error);
         } finally {
-          // Clean up
           video.removeEventListener('loadedmetadata', generateThumbnail);
           video.removeEventListener('seeked', captureThumbnail);
           video.src = '';
@@ -67,8 +71,7 @@ export function TimelineTrack({ segments, sourceVideos, onReorder, onRemove }: T
     });
 
     return () => {
-      // Cleanup all video elements
-      videoElements.forEach(video => {
+      videoElements.forEach((video) => {
         video.src = '';
         video.load();
       });
@@ -155,7 +158,7 @@ export function TimelineTrack({ segments, sourceVideos, onReorder, onRemove }: T
               <div className="flex gap-1 items-center">
             {segments.map((segment, index) => {
               const segmentWidth = segment.duration * pixelsPerSecond;
-              const thumbnail = thumbnails[segment.id];
+              const thumbnail = thumbnails[thumbnailKey(segment)];
               
               return (
                 <div
