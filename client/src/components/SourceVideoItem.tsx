@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Slider } from '@/components/ui/slider';
 import { Play, Pause, Trash2, Copy, GripVertical } from 'lucide-react';
 import type { SourceVideo, TimelineSegment } from '@/types/video';
@@ -124,6 +125,23 @@ export function SourceVideoItem({
 
   const maxDuration = videoDuration || video.duration || 100;
 
+  const clampToRange = (n: number): number =>
+    Math.max(0, Math.min(maxDuration, Number.isFinite(n) ? n : 0));
+
+  const handleStartInputChange = (value: string) => {
+    const n = parseFloat(value);
+    if (!Number.isFinite(n)) return;
+    const start = clampToRange(n);
+    setRange((prev) => [start, Math.max(start, prev[1])]);
+  };
+
+  const handleEndInputChange = (value: string) => {
+    const n = parseFloat(value);
+    if (!Number.isFinite(n)) return;
+    const end = clampToRange(n);
+    setRange((prev) => [Math.min(prev[0], end), end]);
+  };
+
   return (
     <Card className="group">
       <CardContent className="p-4 flex flex-col gap-4">
@@ -136,41 +154,70 @@ export function SourceVideoItem({
           <span className="text-sm font-medium truncate">{video.name}</span>
         </div>
 
-        {/* Video: large, full width */}
-        <div className="relative bg-black rounded-lg overflow-hidden aspect-video min-h-[280px] w-full">
-          <video
-            ref={videoRef}
-            src={video.url}
-            className="w-full h-full object-contain"
-            onLoadedMetadata={handleLoadedMetadata}
-            onTimeUpdate={handleTimeUpdate}
-            onEnded={() => setIsPlaying(false)}
-            playsInline
-            crossOrigin="anonymous"
-            preload="metadata"
-            poster={video.thumbnailUrl}
-          />
-          <div className="absolute bottom-2 left-1/2 -translate-x-1/2">
-            <Button
-              onClick={togglePlayPause}
-              size="lg"
-              className="rounded-full h-14 w-14"
-              variant="secondary"
-            >
-              {isPlaying ? (
-                <Pause className="h-6 w-6" />
-              ) : (
-                <Play className="h-6 w-6" />
-              )}
-            </Button>
-          </div>
-        </div>
+        {/* Video + controls in one column; buttons in a column to the right */}
+        <div className="flex gap-4 items-start">
+          <div className="flex-1 min-w-0 flex flex-col gap-4">
+            <div className="relative bg-black rounded-lg overflow-hidden aspect-video min-h-[280px] w-full">
+              <video
+                ref={videoRef}
+                src={video.url}
+                className="w-full h-full object-contain"
+                onLoadedMetadata={handleLoadedMetadata}
+                onTimeUpdate={handleTimeUpdate}
+                onEnded={() => setIsPlaying(false)}
+                playsInline
+                crossOrigin="anonymous"
+                preload="metadata"
+                poster={video.thumbnailUrl}
+              />
+              <div className="absolute bottom-2 left-1/2 -translate-x-1/2">
+                <Button
+                  onClick={togglePlayPause}
+                  size="lg"
+                  className="rounded-full h-14 w-14"
+                  variant="secondary"
+                >
+                  {isPlaying ? (
+                    <Pause className="h-6 w-6" />
+                  ) : (
+                    <Play className="h-6 w-6" />
+                  )}
+                </Button>
+              </div>
+            </div>
 
-        {/* Controls underneath */}
-        <div className="space-y-3">
-          <div className="flex justify-between text-sm text-muted-foreground">
-            <span>Current: {currentTime.toFixed(2)}s</span>
-            <span>Duration: {maxDuration.toFixed(2)}s</span>
+            {/* Start/end and slider: under the video only */}
+            <div className="space-y-3">
+          <div className="flex justify-between items-center gap-4">
+            <label className="flex items-center gap-2 text-sm font-medium shrink-0">
+              Start
+              <Input
+                type="number"
+                min={0}
+                max={maxDuration}
+                step={0.1}
+                value={range[0].toFixed(2)}
+                onChange={(e) => handleStartInputChange(e.target.value)}
+                className="w-24 h-9 font-mono text-sm"
+              />
+              s
+            </label>
+            <span className="text-sm text-muted-foreground">
+              ({(range[1] - range[0]).toFixed(2)}s)
+            </span>
+            <label className="flex items-center gap-2 text-sm font-medium shrink-0">
+              End
+              <Input
+                type="number"
+                min={0}
+                max={maxDuration}
+                step={0.1}
+                value={range[1].toFixed(2)}
+                onChange={(e) => handleEndInputChange(e.target.value)}
+                className="w-24 h-9 font-mono text-sm"
+              />
+              s
+            </label>
           </div>
 
           <Slider
@@ -179,35 +226,32 @@ export function SourceVideoItem({
             step={0.1}
             value={range}
             onValueChange={(value) => setRange(value as [number, number])}
-            className="w-full"
+            className="w-full min-h-28 py-6 [&>.relative]:!h-8 [&>.relative]:rounded-full [&_.relative]:rounded-full [&>button]:!h-20 [&>button]:!w-20 [&>button]:!rounded-full [&>button]:!border-4 [&>button]:!border-primary [&>button]:!bg-background [&>button]:!shadow-lg [&>button]:cursor-grab [&>button]:active:cursor-grabbing"
           />
-
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <span className="text-xl font-bold text-primary">
-              {range[0].toFixed(2)}s – {range[1].toFixed(2)}s
-              <span className="text-sm font-normal text-muted-foreground ml-2">
-                ({(range[1] - range[0]).toFixed(2)}s)
-              </span>
-            </span>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => onDuplicate(video)}
-                title="Duplicate segment"
-              >
-                <Copy className="h-4 w-4 mr-1" />
-                Duplicate
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => onRemove(segmentId)}
-                title="Remove"
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
             </div>
+          </div>
+
+          <div className="flex flex-col gap-2 shrink-0">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onDuplicate(video)}
+              title="Duplicate segment"
+              className="h-10"
+            >
+              <Copy className="h-4 w-4 mr-1" />
+              Duplicate
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onRemove(segmentId)}
+              title="Remove"
+              className="h-10"
+            >
+              <Trash2 className="h-4 w-4 mr-1" />
+              Delete
+            </Button>
           </div>
         </div>
       </CardContent>
