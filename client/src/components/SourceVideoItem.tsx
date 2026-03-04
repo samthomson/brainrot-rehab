@@ -118,97 +118,88 @@ export function SourceVideoItem({
 
   return (
     <Card className="group">
-      <CardContent className="p-4">
-        <div className="flex gap-4 items-center">
-          {/* Drag Handle + Number */}
-          <div className="cursor-move flex items-center gap-2">
-            <GripVertical className="h-5 w-5 text-muted-foreground" />
-            <div className="flex items-center justify-center h-8 w-8 rounded-full bg-primary/10 text-primary font-bold text-sm">
-              {index + 1}
-            </div>
+      <CardContent className="p-4 flex flex-col gap-4">
+        {/* Top row: drag handle + index + video name */}
+        <div className="cursor-move flex items-center gap-2">
+          <GripVertical className="h-5 w-5 text-muted-foreground shrink-0" />
+          <div className="flex items-center justify-center h-8 w-8 rounded-full bg-primary/10 text-primary font-bold text-sm shrink-0">
+            {index + 1}
+          </div>
+          <span className="text-sm font-medium truncate">{video.name}</span>
+        </div>
+
+        {/* Video: large, full width */}
+        <div className="relative bg-black rounded-lg overflow-hidden aspect-video min-h-[280px] w-full">
+          <video
+            ref={videoRef}
+            src={video.url}
+            className="w-full h-full object-contain"
+            onLoadedMetadata={handleLoadedMetadata}
+            onTimeUpdate={handleTimeUpdate}
+            onEnded={() => setIsPlaying(false)}
+            playsInline
+            crossOrigin="anonymous"
+            preload="metadata"
+            poster={video.thumbnailUrl}
+          />
+          <div className="absolute bottom-2 left-1/2 -translate-x-1/2">
+            <Button
+              onClick={togglePlayPause}
+              size="lg"
+              className="rounded-full h-14 w-14"
+              variant="secondary"
+            >
+              {isPlaying ? (
+                <Pause className="h-6 w-6" />
+              ) : (
+                <Play className="h-6 w-6" />
+              )}
+            </Button>
+          </div>
+        </div>
+
+        {/* Controls underneath */}
+        <div className="space-y-3">
+          <div className="flex justify-between text-sm text-muted-foreground">
+            <span>Current: {currentTime.toFixed(2)}s</span>
+            <span>Duration: {maxDuration.toFixed(2)}s</span>
           </div>
 
-          {/* Video Player */}
-          <div className="w-64 flex-shrink-0">
-            <div className="relative bg-black rounded-lg overflow-hidden aspect-video">
-              <video
-                ref={videoRef}
-                src={video.url}
-                className="w-full h-full object-contain"
-                onLoadedMetadata={handleLoadedMetadata}
-                onTimeUpdate={handleTimeUpdate}
-                onEnded={() => setIsPlaying(false)}
-                playsInline
-                crossOrigin="anonymous"
-                preload="metadata"
-                poster={video.thumbnailUrl}
-              />
-              <div className="absolute bottom-2 left-1/2 -translate-x-1/2">
-                <Button
-                  onClick={togglePlayPause}
-                  size="sm"
-                  className="rounded-full h-10 w-10"
-                  variant="secondary"
-                >
-                  {isPlaying ? (
-                    <Pause className="h-4 w-4" />
-                  ) : (
-                    <Play className="h-4 w-4" />
-                  )}
-                </Button>
-              </div>
-            </div>
-            <div className="mt-1 text-xs font-medium truncate text-center">
-              {video.name}
-            </div>
-          </div>
+          <Slider
+            min={0}
+            max={maxDuration}
+            step={0.1}
+            value={range}
+            onValueChange={(value) => setRange(value as [number, number])}
+            className="w-full"
+          />
 
-          {/* Segment Controls */}
-          <div className="flex-1 space-y-3">
-            <div className="flex justify-between text-xs text-muted-foreground">
-              <span>Current: {currentTime.toFixed(2)}s</span>
-              <span>Duration: {maxDuration.toFixed(2)}s</span>
-            </div>
-
-            <Slider
-              min={0}
-              max={maxDuration}
-              step={0.1}
-              value={range}
-              onValueChange={(value) => setRange(value as [number, number])}
-              className="w-full"
-            />
-            
-            <div className="text-center">
-              <span className="text-xl font-bold text-primary">
-                {range[0].toFixed(2)}s - {range[1].toFixed(2)}s
-              </span>
-              <span className="text-xs text-muted-foreground ml-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="text-xl font-bold text-primary">
+              {range[0].toFixed(2)}s – {range[1].toFixed(2)}s
+              <span className="text-sm font-normal text-muted-foreground ml-2">
                 ({(range[1] - range[0]).toFixed(2)}s)
               </span>
+            </span>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onDuplicate(video)}
+                title="Duplicate segment"
+              >
+                <Copy className="h-4 w-4 mr-1" />
+                Duplicate
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => onRemove(segmentId)}
+                title="Remove"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
             </div>
-          </div>
-
-          {/* Actions */}
-          <div className="flex flex-col gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => onDuplicate(video)}
-              title="Duplicate segment"
-              className="h-9"
-            >
-              <Copy className="h-4 w-4 mr-1" />
-              Duplicate
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => onRemove(segmentId)}
-              title="Remove"
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
           </div>
         </div>
       </CardContent>
