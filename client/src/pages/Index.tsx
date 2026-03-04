@@ -19,7 +19,7 @@ import { RelaySelector } from '@/components/RelaySelector';
 import { BroadcastButton } from '@/components/BroadcastButton';
 import { DVMJobStatus } from '@/components/DVMJobStatus';
 import { useDVMJob } from '@/hooks/useDVMJob';
-import { BRAINROT_RELAY_URL } from '@/lib/dvmRelays';
+import { BRAINROT_RELAY_URL, DEFAULT_BLOSSOM_UPLOAD_URL } from '@/lib/dvmRelays';
 import type { Video, SourceVideo, TimelineSegment, RemixData } from '@/types/video';
 
 const Index = () => {
@@ -40,7 +40,7 @@ const Index = () => {
   const [blocklist, setBlocklist] = usePersistedState<string[]>('video-remix-blocklist', []);
   const [additionalRelays, setAdditionalRelays] = usePersistedState<string[]>('video-remix-additional-relays', []);
   const relayPool = [BRAINROT_RELAY_URL, ...additionalRelays];
-  const [blossomUploadUrl, setBlossomUploadUrl] = usePersistedState<string>('video-remix-blossom-url', 'https://bs.samt.st');
+  const [blossomUploadUrl, setBlossomUploadUrl] = usePersistedState<string>('video-remix-blossom-url', DEFAULT_BLOSSOM_UPLOAD_URL);
   const [dvmPubkey, setDvmPubkey] = usePersistedState<string>('video-remix-dvm-pubkey', '');
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [isClearDialogOpen, setIsClearDialogOpen] = useState(false);

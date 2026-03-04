@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/useToast';
+import { DEFAULT_BLOSSOM_UPLOAD_URL } from '@/lib/dvmRelays';
 
 interface DVMSettingsProps {
   open: boolean;
@@ -71,7 +72,7 @@ export function DVMSettings({
             <Label htmlFor="blossom-url">Blossom Upload URL</Label>
             <Input
               id="blossom-url"
-              placeholder="https://bs.samt.st"
+              placeholder={DEFAULT_BLOSSOM_UPLOAD_URL}
               value={blossomUploadUrl}
               onChange={(e) => onBlossomUrlChange(e.target.value)}
             />
