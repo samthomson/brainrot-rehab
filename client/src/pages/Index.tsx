@@ -40,7 +40,7 @@ const Index = () => {
   const [blocklist, setBlocklist] = usePersistedState<string[]>('video-remix-blocklist', []);
   const [additionalRelays, setAdditionalRelays] = usePersistedState<string[]>('video-remix-additional-relays', []);
   const relayPool = [BRAINROT_RELAY_URL, ...additionalRelays];
-  const [blossomUploadUrl, setBlossomUploadUrl] = usePersistedState<string>('video-remix-blossom-url', 'https://blossom.primal.net');
+  const [blossomUploadUrl, setBlossomUploadUrl] = usePersistedState<string>('video-remix-blossom-url', 'https://bs.samt.st');
   const [dvmPubkey, setDvmPubkey] = usePersistedState<string>('video-remix-dvm-pubkey', '');
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [isClearDialogOpen, setIsClearDialogOpen] = useState(false);

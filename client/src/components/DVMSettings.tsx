@@ -71,7 +71,7 @@ export function DVMSettings({
             <Label htmlFor="blossom-url">Blossom Upload URL</Label>
             <Input
               id="blossom-url"
-              placeholder="https://blossom.primal.net"
+              placeholder="https://bs.samt.st"
               value={blossomUploadUrl}
               onChange={(e) => onBlossomUrlChange(e.target.value)}
             />
