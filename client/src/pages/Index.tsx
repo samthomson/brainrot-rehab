@@ -19,6 +19,7 @@ import { RelaySelector } from '@/components/RelaySelector';
 import { BroadcastButton } from '@/components/BroadcastButton';
 import { DVMJobStatus } from '@/components/DVMJobStatus';
 import { useDVMJob } from '@/hooks/useDVMJob';
+import { BRAINROT_RELAY_URL } from '@/lib/dvmRelays';
 import type { Video, SourceVideo, TimelineSegment, RemixData } from '@/types/video';
 
 const Index = () => {
@@ -37,7 +38,8 @@ const Index = () => {
   const [sourceSegments, setSourceSegments] = usePersistedState<SourceSegment[]>('video-remix-source-segments', []);
   const [timelineSegments, setTimelineSegments] = usePersistedState<TimelineSegment[]>('video-remix-timeline', []);
   const [blocklist, setBlocklist] = usePersistedState<string[]>('video-remix-blocklist', []);
-  const [selectedRelay, setSelectedRelay] = usePersistedState<string>('video-remix-relay', 'wss://relay.local');
+  const [additionalRelays, setAdditionalRelays] = usePersistedState<string[]>('video-remix-additional-relays', []);
+  const relayPool = [BRAINROT_RELAY_URL, ...additionalRelays];
   const [blossomUploadUrl, setBlossomUploadUrl] = usePersistedState<string>('video-remix-blossom-url', 'https://blossom.primal.net');
   const [dvmPubkey, setDvmPubkey] = usePersistedState<string>('video-remix-dvm-pubkey', '');
   const [isPickerOpen, setIsPickerOpen] = useState(false);
@@ -45,7 +47,7 @@ const Index = () => {
   const [isBlocklistOpen, setIsBlocklistOpen] = useState(false);
   const [isDvmSettingsOpen, setIsDvmSettingsOpen] = useState(false);
 
-  const { jobState, broadcastJob, resetJob } = useDVMJob(dvmPubkey, selectedRelay);
+  const { jobState, broadcastJob, resetJob } = useDVMJob(dvmPubkey, relayPool);
 
   // Derive sourceVideos for preview component
   const sourceVideos = sourceSegments.map(s => s.video);
@@ -274,8 +276,8 @@ const Index = () => {
                 <Settings className="h-4 w-4" />
               </Button>
               <RelaySelector
-                selectedRelay={selectedRelay}
-                onRelayChange={setSelectedRelay}
+                additionalRelays={additionalRelays}
+                onAdditionalRelaysChange={setAdditionalRelays}
               />
               <LoginArea className="max-w-60" />
             </div>

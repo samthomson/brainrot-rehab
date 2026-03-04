@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import {
   Popover,
   PopoverContent,
@@ -7,33 +7,41 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Radio, Check, ChevronDown } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Radio, ChevronDown } from 'lucide-react';
 import { useToast } from '@/hooks/useToast';
 import { usePersistedState } from '@/hooks/usePersistedState';
+import { BRAINROT_RELAY_URL, OPTIONAL_RELAY_PRESETS } from '@/lib/dvmRelays';
 
 interface RelaySelectorProps {
-  selectedRelay: string;
-  onRelayChange: (relay: string) => void;
+  /** Enabled additional relays (brainrot is always in the pool). */
+  additionalRelays: string[];
+  onAdditionalRelaysChange: (urls: string[]) => void;
 }
 
-const DEFAULT_RELAYS = [
-  'wss://relay.damus.io',
-  'wss://relay.primal.net',
-  'wss://nos.lol',
-  'wss://relay.nostr.band',
-];
+function stripScheme(url: string): string {
+  return url.replace(/^wss:\/\//, '').replace(/^ws:\/\//, '');
+}
 
-export function RelaySelector({ selectedRelay, onRelayChange }: RelaySelectorProps) {
-  const [customRelay, setCustomRelay] = useState('');
+export function RelaySelector({ additionalRelays, onAdditionalRelaysChange }: RelaySelectorProps) {
+  const [customInput, setCustomInput] = useState('');
   const [open, setOpen] = useState(false);
   const { toast } = useToast();
-  const [customRelays, setCustomRelays] = usePersistedState<string[]>('custom-relays', []);
-  
-  const allRelays = [...DEFAULT_RELAYS, ...customRelays];
+  const [customRelayUrls, setCustomRelayUrls] = usePersistedState<string[]>('dvm-custom-relays', []);
 
-  const handleCustomRelay = () => {
-    const relay = customRelay.trim();
-    if (!relay.startsWith('wss://') && !relay.startsWith('ws://')) {
+  const allOptionalUrls = [...OPTIONAL_RELAY_PRESETS, ...customRelayUrls];
+
+  const toggleRelay = (url: string, enabled: boolean) => {
+    if (enabled) {
+      onAdditionalRelaysChange([...additionalRelays, url]);
+    } else {
+      onAdditionalRelaysChange(additionalRelays.filter((u) => u !== url));
+    }
+  };
+
+  const addCustomRelay = () => {
+    const url = customInput.trim();
+    if (!url.startsWith('wss://') && !url.startsWith('ws://')) {
       toast({
         title: 'Invalid Relay',
         description: 'Relay URL must start with wss:// or ws://',
@@ -41,76 +49,74 @@ export function RelaySelector({ selectedRelay, onRelayChange }: RelaySelectorPro
       });
       return;
     }
-
-    // Add to custom relays list if not already there
-    if (!allRelays.includes(relay)) {
-      setCustomRelays((prev) => [...prev, relay]);
+    if (!customRelayUrls.includes(url)) {
+      setCustomRelayUrls((prev) => [...prev, url]);
     }
-
-    onRelayChange(relay);
-    setCustomRelay('');
+    if (!additionalRelays.includes(url)) {
+      onAdditionalRelaysChange([...additionalRelays, url]);
+    }
+    setCustomInput('');
     setOpen(false);
-    toast({
-      title: 'Relay Added & Selected',
-      description: relay,
-    });
+    toast({ title: 'Relay added', description: stripScheme(url) });
   };
 
-  const displayRelay = selectedRelay.replace('wss://', '').replace('ws://', '');
+  const displayLabel = additionalRelays.length === 0
+    ? stripScheme(BRAINROT_RELAY_URL)
+    : `${stripScheme(BRAINROT_RELAY_URL)} +${additionalRelays.length}`;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button variant="outline" size="sm" className="gap-2">
           <Radio className="h-4 w-4" />
-          <span className="hidden sm:inline">{displayRelay}</span>
+          <span className="hidden sm:inline">{displayLabel}</span>
           <ChevronDown className="h-3 w-3 opacity-50" />
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-80" align="end">
         <div className="space-y-4">
           <div>
-            <h4 className="font-semibold mb-2">Select Relay</h4>
+            <h4 className="font-semibold mb-2">DVM relay pool</h4>
             <p className="text-xs text-muted-foreground mb-3">
-              Choose where to broadcast DVM job requests
+              Our relay is always used; optionally add more.
             </p>
           </div>
 
-          {/* All relays (preset + custom) */}
+          <div className="text-sm font-medium text-muted-foreground">
+            Always on: {stripScheme(BRAINROT_RELAY_URL)}
+          </div>
+
           <div className="space-y-2">
-            {allRelays.map((relay) => (
-              <Button
-                key={relay}
-                variant={selectedRelay === relay ? 'default' : 'outline'}
-                size="sm"
-                className="w-full justify-start"
-                onClick={() => {
-                  onRelayChange(relay);
-                  setOpen(false);
-                }}
-              >
-                {selectedRelay === relay && <Check className="h-4 w-4 mr-2" />}
-                {relay.replace('wss://', '').replace('ws://', '')}
-              </Button>
+            <Label className="text-xs">Additional relays</Label>
+            {allOptionalUrls.map((url) => (
+              <div key={url} className="flex items-center gap-2">
+                <Checkbox
+                  id={url}
+                  checked={additionalRelays.includes(url)}
+                  onCheckedChange={(checked) => toggleRelay(url, checked === true)}
+                />
+                <label htmlFor={url} className="text-sm cursor-pointer flex-1 truncate">
+                  {stripScheme(url)}
+                </label>
+              </div>
             ))}
           </div>
 
-          {/* Custom relay */}
           <div className="space-y-2 pt-2 border-t">
             <Label htmlFor="custom-relay" className="text-xs">
-              Custom Relay
+              Add custom relay
             </Label>
             <div className="flex gap-2">
               <Input
                 id="custom-relay"
                 placeholder="wss://relay.example.com"
-                value={customRelay}
-                onChange={(e) => setCustomRelay(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleCustomRelay()}
+                value={customInput}
+                onChange={(e) => setCustomInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && addCustomRelay()}
                 className="text-sm"
               />
-              <Button onClick={handleCustomRelay} size="sm">
-                Set
+              <Button onClick={addCustomRelay} size="sm">
+                Add
               </Button>
             </div>
           </div>

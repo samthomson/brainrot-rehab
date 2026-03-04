@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useNostr } from '@nostrify/react';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { useToast } from '@/hooks/useToast';
@@ -21,42 +21,147 @@ interface DVMJobState {
   errorMessage?: string;
 }
 
-export function useDVMJob(dvmPubkey: string, selectedRelay: string) {
+/** Publish event to all relays in the pool; succeeds if at least one accepts. */
+async function publishToPool(
+  nostr: { relay: (url: string) => { event: (ev: NostrEvent) => Promise<unknown> } },
+  relays: string[],
+  event: NostrEvent,
+  timeoutMs = 10_000
+): Promise<void> {
+  if (relays.length === 0) throw new Error('No relays in pool');
+  const results = await Promise.allSettled(
+    relays.map((url) =>
+      Promise.race([
+        nostr.relay(url).event(event),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('Relay timeout')), timeoutMs)
+        ),
+      ])
+    )
+  );
+  const fulfilled = results.filter((r) => r.status === 'fulfilled');
+  if (fulfilled.length === 0) {
+    const reason = (results[0] as PromiseRejectedResult)?.reason;
+    throw reason ?? new Error('All relays failed');
+  }
+}
+
+export function useDVMJob(dvmPubkey: string, relays: string[]) {
   const { nostr } = useNostr();
   const { user } = useCurrentUser();
   const { toast } = useToast();
   const [jobState, setJobState] = useState<DVMJobState>({ status: 'idle' });
   const [currentJobId, setCurrentJobId] = useState<string | null>(null);
+  const seenEventIds = useRef<Set<string>>(new Set());
 
-  // Subscribe to task events for current job
-  useEffect(() => {
-    if (!currentJobId || !dvmPubkey) {
-      console.log('Not subscribing - missing jobId or dvmPubkey:', { currentJobId, dvmPubkey });
-      return;
-    }
+  const handleNip98Signing = useCallback(
+    async (task: DVMTask, jobRequestId: string) => {
+      if (!user || !task.url || !task.method || !task.payload_hash) return;
 
-    console.log('🔔 Subscribing to DVM tasks:', {
-      jobId: currentJobId,
-      dvmPubkey,
-      relay: selectedRelay,
-    });
-
-    const relay = nostr.relay(selectedRelay);
-    
-    const sub = relay.req([
-      {
-        kinds: [30534], // Task events
-        authors: [dvmPubkey],
-        '#d': [currentJobId],
-      },
-    ]);
-
-    sub.on('event', async (taskEvent: NostrEvent) => {
       try {
-        console.log('📨 Received task event:', taskEvent);
+        console.log('Signing NIP-98 auth event...');
+
+        const nip98Event = await user.signer.signEvent({
+          kind: 27235,
+          content: '',
+          tags: [
+            ['u', task.url],
+            ['method', task.method],
+            ['payload', task.payload_hash],
+          ],
+          created_at: Math.floor(Date.now() / 1000),
+        });
+
+        const responseEvent = await user.signer.signEvent({
+          kind: 30535,
+          content: JSON.stringify(nip98Event),
+          tags: [
+            ['e', jobRequestId],
+            ['p', dvmPubkey],
+          ],
+          created_at: Math.floor(Date.now() / 1000),
+        });
+
+        await publishToPool(nostr, relays, responseEvent);
+
+        setJobState({ status: 'uploading', currentTask: task });
+        toast({
+          title: 'Upload Authorized',
+          description: 'DVM is now uploading your video...',
+        });
+      } catch (error) {
+        console.error('Error signing NIP-98:', error);
+        toast({
+          title: 'Signing Failed',
+          description: 'Failed to sign upload authorization',
+          variant: 'destructive',
+        });
+      }
+    },
+    [user, nostr, relays, dvmPubkey, toast]
+  );
+
+  const handleEventSigning = useCallback(
+    async (task: DVMTask, jobRequestId: string) => {
+      if (!user || !task.event) return;
+
+      try {
+        const template = {
+          kind: task.event.kind!,
+          content: task.event.content ?? '',
+          tags: (task.event.tags ?? []) as [string, string][],
+          created_at: task.event.created_at ?? Math.floor(Date.now() / 1000),
+        };
+        const signedVideoEvent = await user.signer.signEvent(template);
+
+        const responseEvent = await user.signer.signEvent({
+          kind: 30535,
+          content: JSON.stringify(signedVideoEvent),
+          tags: [
+            ['e', jobRequestId],
+            ['p', dvmPubkey],
+          ],
+          created_at: Math.floor(Date.now() / 1000),
+        });
+
+        await publishToPool(nostr, relays, responseEvent);
+
+        toast({
+          title: 'Video Signed',
+          description: 'DVM is publishing your remix...',
+        });
+      } catch (error) {
+        console.error('Error signing video event:', error);
+        toast({
+          title: 'Signing Failed',
+          description: 'Failed to sign video event',
+          variant: 'destructive',
+        });
+      }
+    },
+    [user, nostr, relays, dvmPubkey, toast]
+  );
+
+  // Subscribe to task events on all relays in the pool
+  useEffect(() => {
+    if (!currentJobId || !dvmPubkey || relays.length === 0) return;
+
+    seenEventIds.current = new Set();
+    const filter = {
+      kinds: [30534],
+      authors: [dvmPubkey],
+      '#d': [currentJobId],
+    };
+
+    const controller = new AbortController();
+    const signal = controller.signal;
+
+    const handleEvent = async (taskEvent: NostrEvent) => {
+      if (seenEventIds.current.has(taskEvent.id)) return;
+      seenEventIds.current.add(taskEvent.id);
+
+      try {
         const task: DVMTask = JSON.parse(taskEvent.content);
-        console.log('📋 Parsed task:', task);
-        
         setJobState({ status: 'pending', currentTask: task });
 
         if (task.type === 'sign_nip98') {
@@ -66,8 +171,8 @@ export function useDVMJob(dvmPubkey: string, selectedRelay: string) {
           setJobState({ status: 'awaiting_signature', currentTask: task });
           await handleEventSigning(task, currentJobId);
         } else if (task.type === 'success') {
-          setJobState({ 
-            status: 'complete', 
+          setJobState({
+            status: 'complete',
             currentTask: task,
             resultEventId: task.result_event_id,
           });
@@ -76,8 +181,8 @@ export function useDVMJob(dvmPubkey: string, selectedRelay: string) {
             description: 'Your remix has been published to Nostr',
           });
         } else if (task.type === 'error') {
-          setJobState({ 
-            status: 'error', 
+          setJobState({
+            status: 'error',
             currentTask: task,
             errorMessage: task.message,
           });
@@ -90,173 +195,87 @@ export function useDVMJob(dvmPubkey: string, selectedRelay: string) {
       } catch (error) {
         console.error('Error handling task:', error);
       }
+    };
+
+    relays.forEach((url) => {
+      const relay = nostr.relay(url);
+      const sub = relay.req([filter], { signal });
+      (async () => {
+        try {
+          for await (const msg of sub) {
+            if (msg[0] === 'EVENT') handleEvent(msg[2]);
+          }
+        } catch (_) {
+          // Aborted or relay closed
+        }
+      })();
     });
 
-    return () => {
-      sub.close();
-    };
-  }, [currentJobId, dvmPubkey, selectedRelay, nostr, toast]);
+    return () => controller.abort();
+  }, [currentJobId, dvmPubkey, relays, nostr, toast, handleNip98Signing, handleEventSigning]);
 
-  const handleNip98Signing = useCallback(async (task: DVMTask, jobRequestId: string) => {
-    if (!user || !task.url || !task.method || !task.payload_hash) return;
+  const broadcastJob = useCallback(
+    async (remixData: unknown): Promise<string | null> => {
+      if (!user) {
+        toast({
+          title: 'Login Required',
+          description: 'Please login with Nostr to broadcast job requests',
+          variant: 'destructive',
+        });
+        return null;
+      }
 
-    try {
-      console.log('Signing NIP-98 auth event...');
-      
-      const nip98Event = await user.signer.signEvent({
-        kind: 27235,
-        content: '',
-        tags: [
-          ['u', task.url],
-          ['method', task.method],
-          ['payload', task.payload_hash],
-        ],
-        created_at: Math.floor(Date.now() / 1000),
-      });
+      setJobState({ status: 'broadcasting' });
 
-      console.log('NIP-98 signed:', nip98Event);
+      try {
+        const totalDuration = (remixData as { segments: { startTime: number; endTime: number }[] }).segments.reduce(
+          (sum: number, seg: { startTime: number; endTime: number }) => sum + (seg.endTime - seg.startTime),
+          0
+        );
 
-      // Send response back to DVM (30535 envelope must be signed by user so DVM can verify author)
-      const responseEvent = await user.signer.signEvent({
-        kind: 30535,
-        content: JSON.stringify(nip98Event),
-        tags: [
-          ['e', jobRequestId],
-          ['p', dvmPubkey],
-        ],
-        created_at: Math.floor(Date.now() / 1000),
-      });
-      const relay = nostr.relay(selectedRelay);
-      await relay.event(responseEvent);
-
-      console.log('NIP-98 response sent to DVM');
-      setJobState({ status: 'uploading', currentTask: task });
-      
-      toast({
-        title: 'Upload Authorized',
-        description: 'DVM is now uploading your video...',
-      });
-    } catch (error) {
-      console.error('Error signing NIP-98:', error);
-      toast({
-        title: 'Signing Failed',
-        description: 'Failed to sign upload authorization',
-        variant: 'destructive',
-      });
-    }
-  }, [user, nostr, selectedRelay, dvmPubkey, toast]);
-
-  const handleEventSigning = useCallback(async (task: DVMTask, jobRequestId: string) => {
-    if (!user || !task.event) return;
-
-    try {
-      console.log('Signing video event...');
-      
-      const signedVideoEvent = await user.signer.signEvent(task.event);
-      console.log('Video event signed:', signedVideoEvent);
-
-      // Send response back to DVM (30535 envelope must be signed by user so DVM can verify author)
-      const responseEvent = await user.signer.signEvent({
-        kind: 30535,
-        content: JSON.stringify(signedVideoEvent),
-        tags: [
-          ['e', jobRequestId],
-          ['p', dvmPubkey],
-        ],
-        created_at: Math.floor(Date.now() / 1000),
-      });
-      const relay = nostr.relay(selectedRelay);
-      await relay.event(responseEvent);
-
-      console.log('Video event response sent to DVM');
-      
-      toast({
-        title: 'Video Signed',
-        description: 'DVM is publishing your remix...',
-      });
-    } catch (error) {
-      console.error('Error signing video event:', error);
-      toast({
-        title: 'Signing Failed',
-        description: 'Failed to sign video event',
-        variant: 'destructive',
-      });
-    }
-  }, [user, nostr, selectedRelay, dvmPubkey, toast]);
-
-  const broadcastJob = useCallback(async (remixData: unknown): Promise<string | null> => {
-    if (!user) {
-      toast({
-        title: 'Login Required',
-        description: 'Please login with Nostr to broadcast job requests',
-        variant: 'destructive',
-      });
-      return null;
-    }
-
-    setJobState({ status: 'broadcasting' });
-
-    try {
-      const totalDuration = (remixData as any).segments.reduce(
-        (sum: number, seg: any) => sum + (seg.endTime - seg.startTime), 
-        0
-      );
-      
-      const unsignedEvent = {
-        kind: 5342,
-        content: JSON.stringify(remixData),
-        tags: [
+        const segments = (remixData as { segments: unknown[] }).segments;
+        const tags: string[][] = [
           ['output', 'video/mp4'],
-          ['relays', selectedRelay],
-          ['param', 'segments', (remixData as any).segments.length.toString()],
+          ...relays.map((url) => ['relays', url] as [string, string]),
+          ['param', 'segments', String(segments.length)],
           ['param', 'duration', totalDuration.toFixed(2)],
           ['t', 'brainrot'],
           ['client', 'brainrot.rehab'],
-          ['alt', `Video remix job: combine ${(remixData as any).segments.length} segments into one video (${totalDuration.toFixed(2)}s total)`],
-        ],
-        created_at: Math.floor(Date.now() / 1000),
-      };
+          ['alt', `Video remix job: combine ${segments.length} segments into one video (${totalDuration.toFixed(2)}s total)`],
+        ];
 
-      const signedEvent = await user.signer.signEvent(unsignedEvent);
-      console.log('Job request signed:', signedEvent);
+        const unsignedEvent = {
+          kind: 5342,
+          content: JSON.stringify(remixData),
+          tags,
+          created_at: Math.floor(Date.now() / 1000),
+        };
 
-      const relay = nostr.relay(selectedRelay);
-      
-      await Promise.race([
-        relay.event(signedEvent),
-        new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Relay timeout after 10 seconds')), 10000)
-        ),
-      ]);
+        const signedEvent = await user.signer.signEvent(unsignedEvent);
+        await publishToPool(nostr, relays, signedEvent);
 
-      console.log('=== DVM Job Request Published ===');
-      console.log('Job ID:', signedEvent.id);
-      console.log('Relay:', selectedRelay);
+        setCurrentJobId(signedEvent.id);
+        setJobState({ status: 'pending' });
 
-      setCurrentJobId(signedEvent.id);
-      setJobState({ status: 'pending' });
+        toast({
+          title: 'Job Broadcasted! 📡',
+          description: 'DVM is starting to process your remix...',
+        });
 
-      toast({
-        title: 'Job Broadcasted! 📡',
-        description: 'DVM is starting to process your remix...',
-      });
-
-      return signedEvent.id;
-    } catch (error) {
-      console.error('=== Broadcast Error ===', error);
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      
-      setJobState({ status: 'error', errorMessage });
-      
-      toast({
-        title: 'Broadcast Failed',
-        description: errorMessage,
-        variant: 'destructive',
-      });
-
-      return null;
-    }
-  }, [user, nostr, selectedRelay, toast]);
+        return signedEvent.id;
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        setJobState({ status: 'error', errorMessage });
+        toast({
+          title: 'Broadcast Failed',
+          description: errorMessage,
+          variant: 'destructive',
+        });
+        return null;
+      }
+    },
+    [user, nostr, relays, toast]
+  );
 
   return {
     jobState,
