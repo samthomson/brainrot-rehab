@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Slider } from '@/components/ui/slider';
+import { ChunkySlider } from '@/components/ChunkySlider';
 import { Play, Pause, Trash2, Copy, GripVertical } from 'lucide-react';
 import type { SourceVideo, TimelineSegment } from '@/types/video';
 
@@ -220,13 +220,12 @@ export function SourceVideoItem({
             </label>
           </div>
 
-          <Slider
+          <ChunkySlider
             min={0}
             max={maxDuration}
             step={0.1}
             value={range}
             onValueChange={(value) => setRange(value as [number, number])}
-            className="w-full min-h-28 py-6 [&>.relative]:!h-8 [&>.relative]:rounded-full [&_.relative]:rounded-full [&>button]:!h-20 [&>button]:!w-20 [&>button]:!rounded-full [&>button]:!border-4 [&>button]:!border-primary [&>button]:!bg-background [&>button]:!shadow-lg [&>button]:cursor-grab [&>button]:active:cursor-grabbing"
           />
             </div>
           </div>
