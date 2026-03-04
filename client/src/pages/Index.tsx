@@ -70,14 +70,15 @@ const Index = () => {
     setSourceSegments((prev) => [...prev, newSegment]);
     
     // Create initial timeline segment
+    const fullDuration = sourceVideo.duration ?? 5;
     const timelineSegment: TimelineSegment = {
       id: newSegment.id,
       sourceVideoId: sourceVideo.id,
       videoName: sourceVideo.name,
       videoEventId: sourceVideo.event.id,
       startTime: 0,
-      endTime: Math.min(5, sourceVideo.duration || 5),
-      duration: Math.min(5, sourceVideo.duration || 5),
+      endTime: fullDuration,
+      duration: fullDuration,
       order: sourceSegments.length,
     };
     
@@ -98,14 +99,15 @@ const Index = () => {
     setSourceSegments((prev) => [...prev, newSegment]);
     
     // Create initial timeline segment for duplicate
+    const fullDuration = video.duration ?? 5;
     const timelineSegment: TimelineSegment = {
       id: newSegment.id,
       sourceVideoId: video.id,
       videoName: video.name,
       videoEventId: video.event.id,
       startTime: 0,
-      endTime: Math.min(5, video.duration || 5),
-      duration: Math.min(5, video.duration || 5),
+      endTime: fullDuration,
+      duration: fullDuration,
       order: timelineSegments.length,
     };
     
@@ -298,6 +300,7 @@ const Index = () => {
           <div className="lg:col-span-2">
             <SourceVideosList
               sourceSegments={sourceSegments}
+              timelineSegments={timelineSegments}
               onAddSourceVideo={handleAddSourceVideo}
               onRemoveSegment={handleRemoveSegment}
               onDuplicateVideo={handleDuplicateVideo}

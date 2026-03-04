@@ -18,22 +18,31 @@ export function RemixPreview({ segments, sourceVideos }: RemixPreviewProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const preloadVideoRef = useRef<HTMLVideoElement>(null);
 
-  // Reset to first segment when segments change
+  // Reset to first segment when segments or their order changes
+  const segmentKey = segments.map((s) => s.id).join(',');
   useEffect(() => {
     setCurrentSegmentIndex(0);
     setSegmentProgress(0);
     setTotalProgress(0);
     setIsPlaying(false);
-  }, [segments.length]);
+  }, [segmentKey]);
+
+  // Clamp index when segment list shrinks (e.g. after reorder or remove)
+  const safeSegmentIndex = Math.min(currentSegmentIndex, Math.max(0, segments.length - 1));
+  useEffect(() => {
+    if (currentSegmentIndex !== safeSegmentIndex) {
+      setCurrentSegmentIndex(safeSegmentIndex);
+    }
+  }, [currentSegmentIndex, safeSegmentIndex]);
 
   const totalDuration = segments.reduce((sum, seg) => sum + seg.duration, 0);
-  const currentSegment = segments[currentSegmentIndex];
+  const currentSegment = segments[safeSegmentIndex];
   const sourceVideo = currentSegment
     ? sourceVideos.find((v) => v.id === currentSegment.sourceVideoId)
     : null;
 
   // Preload next segment
-  const nextSegment = segments[currentSegmentIndex + 1];
+  const nextSegment = segments[safeSegmentIndex + 1];
   const nextSourceVideo = nextSegment
     ? sourceVideos.find((v) => v.id === nextSegment.sourceVideoId)
     : null;
@@ -59,7 +68,7 @@ export function RemixPreview({ segments, sourceVideos }: RemixPreviewProps) {
         });
       }
     }
-  }, [currentSegmentIndex, currentSegment, sourceVideo, isPlaying]);
+  }, [safeSegmentIndex, currentSegment, sourceVideo, isPlaying]);
 
   const handleTimeUpdate = () => {
     if (!videoRef.current || !currentSegment) return;
@@ -69,8 +78,8 @@ export function RemixPreview({ segments, sourceVideos }: RemixPreviewProps) {
     // Check if we've reached the end of this segment
     if (currentTime >= currentSegment.endTime) {
       // Move to next segment
-      if (currentSegmentIndex < segments.length - 1) {
-        setCurrentSegmentIndex((prev) => prev + 1);
+      if (safeSegmentIndex < segments.length - 1) {
+        setCurrentSegmentIndex((prev) => Math.min(prev + 1, segments.length - 1));
       } else {
         // End of timeline
         setIsPlaying(false);
@@ -85,7 +94,7 @@ export function RemixPreview({ segments, sourceVideos }: RemixPreviewProps) {
       setSegmentProgress(segmentProg);
 
       // Calculate total progress
-      const segmentsBefore = segments.slice(0, currentSegmentIndex);
+      const segmentsBefore = segments.slice(0, safeSegmentIndex);
       const durationBefore = segmentsBefore.reduce((sum, seg) => sum + seg.duration, 0);
       const totalElapsed = durationBefore + segmentElapsed;
       const totalProg = (totalElapsed / totalDuration) * 100;
@@ -115,15 +124,15 @@ export function RemixPreview({ segments, sourceVideos }: RemixPreviewProps) {
   };
 
   const handlePrevious = () => {
-    if (currentSegmentIndex > 0) {
-      setCurrentSegmentIndex((prev) => prev - 1);
+    if (safeSegmentIndex > 0) {
+      setCurrentSegmentIndex((prev) => Math.max(0, prev - 1));
       setSegmentProgress(0);
     }
   };
 
   const handleNext = () => {
-    if (currentSegmentIndex < segments.length - 1) {
-      setCurrentSegmentIndex((prev) => prev + 1);
+    if (safeSegmentIndex < segments.length - 1) {
+      setCurrentSegmentIndex((prev) => Math.min(prev + 1, segments.length - 1));
       setSegmentProgress(0);
     }
   };
@@ -157,7 +166,7 @@ export function RemixPreview({ segments, sourceVideos }: RemixPreviewProps) {
           Preview
         </CardTitle>
         <p className="text-sm text-muted-foreground">
-          Segment {currentSegmentIndex + 1} of {segments.length}
+          Segment {safeSegmentIndex + 1} of {segments.length}
         </p>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -243,7 +252,7 @@ export function RemixPreview({ segments, sourceVideos }: RemixPreviewProps) {
             variant="outline"
             size="icon"
             onClick={handleRestart}
-            disabled={currentSegmentIndex === 0 && segmentProgress === 0}
+            disabled={safeSegmentIndex === 0 && segmentProgress === 0}
           >
             <SkipBack className="h-4 w-4" />
           </Button>
@@ -252,7 +261,7 @@ export function RemixPreview({ segments, sourceVideos }: RemixPreviewProps) {
             variant="outline"
             size="icon"
             onClick={handlePrevious}
-            disabled={currentSegmentIndex === 0}
+            disabled={safeSegmentIndex === 0}
           >
             <SkipBack className="h-4 w-4" />
           </Button>
@@ -275,7 +284,7 @@ export function RemixPreview({ segments, sourceVideos }: RemixPreviewProps) {
             variant="outline"
             size="icon"
             onClick={handleNext}
-            disabled={currentSegmentIndex === segments.length - 1}
+            disabled={safeSegmentIndex === segments.length - 1}
           >
             <SkipForward className="h-4 w-4" />
           </Button>

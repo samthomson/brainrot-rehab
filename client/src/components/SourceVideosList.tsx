@@ -12,6 +12,7 @@ interface SourceSegment {
 
 interface SourceVideosListProps {
   sourceSegments: SourceSegment[];
+  timelineSegments: TimelineSegment[];
   onAddSourceVideo: () => void;
   onRemoveSegment: (segmentId: string) => void;
   onDuplicateVideo: (video: SourceVideo) => void;
@@ -23,6 +24,7 @@ interface SourceVideosListProps {
 
 export function SourceVideosList({
   sourceSegments,
+  timelineSegments,
   onAddSourceVideo,
   onRemoveSegment,
   onDuplicateVideo,
@@ -107,6 +109,8 @@ export function SourceVideosList({
               video={segment.video}
               segmentId={segment.id}
               index={index}
+              initialStartTime={timelineSegments.find((t) => t.id === segment.id)?.startTime}
+              initialEndTime={timelineSegments.find((t) => t.id === segment.id)?.endTime}
               onRemove={onRemoveSegment}
               onDuplicate={onDuplicateVideo}
               onSegmentChange={onSegmentChange}

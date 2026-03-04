@@ -9,6 +9,8 @@ interface SourceVideoItemProps {
   video: SourceVideo;
   segmentId: string;
   index: number;
+  initialStartTime?: number;
+  initialEndTime?: number;
   onRemove: (segmentId: string) => void;
   onDuplicate: (video: SourceVideo) => void;
   onSegmentChange: (segmentId: string, segment: Omit<TimelineSegment, 'id' | 'order'>) => void;
@@ -19,14 +21,16 @@ interface SourceVideoItemProps {
 export function SourceVideoItem({ 
   video, 
   segmentId, 
-  index, 
+  index,
+  initialStartTime,
+  initialEndTime,
   onRemove, 
   onDuplicate, 
   onSegmentChange,
   onPlayingChange,
   shouldPause,
 }: SourceVideoItemProps) {
-  const [range, setRange] = useState<[number, number]>([0, 5]);
+  const [range, setRange] = useState<[number, number]>([initialStartTime ?? 0, initialEndTime ?? 5]);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [videoDuration, setVideoDuration] = useState(0);
@@ -37,7 +41,7 @@ export function SourceVideoItem({
     if (videoRef.current) {
       const duration = videoRef.current.duration;
       setVideoDuration(duration);
-      setRange([0, Math.min(5, duration)]);
+      setRange([0, duration]);
     }
   }, []);
 
