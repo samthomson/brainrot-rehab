@@ -7,3 +7,4 @@ RUN npm ci
 COPY src ./src
 RUN chown -R node:node /app
 USER node
+CMD ["npm", "run", "dev"]

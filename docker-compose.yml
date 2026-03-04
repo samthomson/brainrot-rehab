@@ -1,0 +1,29 @@
+services:
+  dvm:
+    build: ./dvm
+    environment:
+      - RELAYS=${RELAYS}
+      - DVM_SECRET_KEY=${DVM_SECRET_KEY}
+      - NODE_TLS_REJECT_UNAUTHORIZED=0
+    restart: unless-stopped
+    volumes:
+      - ./dvm/src:/app/src
+    networks:
+      - relaykit-proto_default
+    extra_hosts:
+      - "relay.local:host-gateway"
+
+  client:
+    build: ./client
+    ports:
+      - "3001:8080"
+    volumes:
+      - ./client/src:/app/src
+      - ./client/public:/app/public
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+    restart: unless-stopped
+
+networks:
+  relaykit-proto_default:
+    external: true

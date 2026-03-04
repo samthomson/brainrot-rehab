@@ -1,16 +1,26 @@
-# brainrot-dvm
+# brainrot
 
-Nostr DVM for video composition: subscribes to job requests (kind 5342), runs ffmpeg to trim/concat segments, then uses replaceable task events (30534) so the client signs NIP-98 (Blossom upload) and the final kind 34236. All over relays, no DMs.
+Video remixing platform: Nostr client + DVM for composing video segments.
+
+- **client/** - React/Vite frontend for creating video remixes
+- **dvm/** - Nostr DVM backend that processes video jobs with ffmpeg
 
 ## Quick Start
 
 ```bash
+# Copy env template and set your DVM private key
 cp .env.example .env
-# Set DVM_SECRET_KEY (hex, 64 chars) and optionally RELAYS
+# Edit .env: set DVM_SECRET_KEY (hex, 64 chars) and optionally RELAYS
+
+# Run both services
 docker compose up --build
 ```
 
-The DVM connects to the relay(s) in `RELAYS` and subscribes to kind 5342. It does not run a relay.
+**Services:**
+- **Client:** http://localhost:3001 (React app with hot reload)
+- **DVM:** Connects to relay(s) and subscribes to kind 5342 job requests
+
+Both services auto-reload on file changes via volume mounts.
 
 ---
 
