@@ -154,7 +154,7 @@ export function TimelineTrack({ segments, sourceVideos, onReorder, onRemove }: T
             </div>
 
             {/* Timeline track */}
-            <div className="relative bg-muted/30 rounded-lg p-2 min-h-24">
+            <div className="relative bg-muted/30 rounded-lg p-2 min-h-36">
               <div className="flex gap-1 items-center">
             {segments.map((segment, index) => {
               const segmentWidth = segment.duration * pixelsPerSecond;
@@ -170,7 +170,7 @@ export function TimelineTrack({ segments, sourceVideos, onReorder, onRemove }: T
                   className="relative group cursor-move"
                   style={{ width: `${segmentWidth}px` }}
                 >
-                  <Card className="h-40 border-2 border-primary/50 hover:border-primary transition-colors overflow-hidden">
+                  <Card className="h-60 border-2 border-primary/50 hover:border-primary transition-colors overflow-hidden">
                     <CardContent className="p-0 h-full flex relative">
                       {/* Thumbnail */}
                       {thumbnail ? (
