@@ -69,24 +69,15 @@ export function DVMJobStatus({ status, currentTask, resultEventId, errorMessage,
               <p className="text-xs text-muted-foreground mb-1">Video Event ID:</p>
               <code className="text-xs break-all">{resultEventId}</code>
             </div>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => window.open(`https://njump.me/${resultEventId}`, '_blank')}
-              >
-                View on njump
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  navigator.clipboard.writeText(resultEventId);
-                }}
-              >
-                Copy ID
-              </Button>
-            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                navigator.clipboard.writeText(resultEventId);
+              }}
+            >
+              Copy ID
+            </Button>
           </div>
         )}
 
