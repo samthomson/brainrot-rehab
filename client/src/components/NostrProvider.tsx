@@ -3,6 +3,7 @@ import { NostrEvent, NostrFilter, NPool, NRelay1 } from '@nostrify/nostrify';
 import { NostrContext } from '@nostrify/react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAppContext } from '@/hooks/useAppContext';
+import { BRAINROT_RELAY_URL } from '@/lib/dvmRelays';
 
 interface NostrProviderProps {
   children: React.ReactNode;
@@ -44,6 +45,18 @@ const NostrProvider: React.FC<NostrProviderProps> = (props) => {
           routes.set(url, filters);
         }
 
+        // Always include brainrot relay for kind 34236 (video) queries
+        const needsBrainrot = filters.some(
+          f => f.kinds?.includes(34236)
+        );
+        if (needsBrainrot && !routes.has(BRAINROT_RELAY_URL)) {
+          routes.set(BRAINROT_RELAY_URL, filters);
+        }
+
+        if (needsBrainrot) {
+          console.log('[brainrot-debug] Relays for kind 34236:', [...routes.keys()]);
+        }
+
         return routes;
       },
       eventRouter(_event: NostrEvent) {
@@ -56,7 +69,7 @@ const NostrProvider: React.FC<NostrProviderProps> = (props) => {
 
         return [...allRelays];
       },
-      eoseTimeout: 200,
+      eoseTimeout: 2000,
     });
   }
 

@@ -17,8 +17,8 @@ process.on('unhandledRejection', (reason, promise) => {
 import { runJob } from './job.js'
 import { JOB_REQUEST_KIND } from './types.js'
 
-/** Single source of truth for default relay (do not duplicate elsewhere). */
-const DEFAULT_RELAY = 'wss://relay.samt.st'
+/** Must match client's BRAINROT_RELAY_URL - client publishes jobs here. */
+const DEFAULT_RELAY = 'wss://relay.brainrot.rehab'
 const RELAYS = (process.env.RELAYS || DEFAULT_RELAY).split(',').map((s) => s.trim())
 const DVM_SECRET_KEY_HEX = process.env.DVM_SECRET_KEY
 if (!DVM_SECRET_KEY_HEX) {

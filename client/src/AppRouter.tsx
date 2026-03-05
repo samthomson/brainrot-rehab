@@ -1,7 +1,10 @@
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
 import { ScrollToTop } from "./components/ScrollToTop";
+import { BrainrotLayout } from "./components/BrainrotLayout";
 
-import Index from "./pages/Index";
+import RotPage from "./pages/RotPage";
+import RottenPage from "./pages/RottenPage";
+import RehabPage from "./pages/RehabPage";
 import { NIP19Page } from "./pages/NIP19Page";
 import NotFound from "./pages/NotFound";
 
@@ -10,10 +13,14 @@ export function AppRouter() {
     <BrowserRouter>
       <ScrollToTop />
       <Routes>
-        <Route path="/" element={<Index />} />
+        <Route path="/" element={<BrainrotLayout />}>
+          <Route index element={<Navigate to="/rot" replace />} />
+          <Route path="rot" element={<RotPage />} />
+          <Route path="rotten" element={<RottenPage />} />
+          <Route path="rehab" element={<RehabPage />} />
+        </Route>
         {/* NIP-19 route for npub1, note1, naddr1, nevent1, nprofile1 */}
         <Route path="/:nip19" element={<NIP19Page />} />
-        {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
         <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>

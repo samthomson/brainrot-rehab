@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { useNostr } from '@nostrify/react';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { useToast } from '@/hooks/useToast';
+import { BRAINROT_CLIENT_TAG } from '@/lib/dvmRelays';
 import type { NostrEvent } from '@nostrify/nostrify';
 
 interface DVMTask {
@@ -142,10 +143,15 @@ export function useDVMJob(dvmPubkey: string, relays: string[]) {
           
           setJobState({ status: 'awaiting_signature', currentTask: task });
           
+          // Ensure client tag is present - DVM sends it but ensure we never publish without it
+          let tags = (task.event.tags ?? []) as [string, string][];
+          if (task.event.kind === 34236 && !tags.some(([n]) => n === 'client')) {
+            tags = [...tags, ['client', BRAINROT_CLIENT_TAG]];
+          }
           const template = {
             kind: task.event.kind!,
             content: task.event.content ?? '',
-            tags: (task.event.tags ?? []) as [string, string][],
+            tags,
             created_at: task.event.created_at ?? Math.floor(Date.now() / 1000),
           };
           const signedVideoEvent = await user.signer.signEvent(template);

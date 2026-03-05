@@ -35,6 +35,7 @@ const defaultConfig: AppConfig = {
   theme: "light",
   relayMetadata: {
     relays: [
+      { url: 'wss://relay.brainrot.rehab', read: true, write: true },
       { url: 'wss://relay.ditto.pub', read: true, write: true },
       { url: 'wss://relay.primal.net', read: true, write: true },
       { url: 'wss://relay.damus.io', read: true, write: true },

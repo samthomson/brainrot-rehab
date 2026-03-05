@@ -11,9 +11,12 @@ import { cn } from '@/lib/utils';
 
 export interface LoginAreaProps {
   className?: string;
+  /** Simplified mode: smaller avatar, Settings in dropdown instead of switch/add */
+  simplified?: boolean;
+  onSettingsClick?: () => void;
 }
 
-export function LoginArea({ className }: LoginAreaProps) {
+export function LoginArea({ className, simplified, onSettingsClick }: LoginAreaProps) {
   const { currentUser } = useLoggedInAccounts();
   const [loginDialogOpen, setLoginDialogOpen] = useState(false);
   const [signupDialogOpen, setSignupDialogOpen] = useState(false);
@@ -26,7 +29,11 @@ export function LoginArea({ className }: LoginAreaProps) {
   return (
     <div className={cn("inline-flex items-center justify-center", className)}>
       {currentUser ? (
-        <AccountSwitcher onAddAccountClick={() => setLoginDialogOpen(true)} />
+        <AccountSwitcher
+          onAddAccountClick={() => setLoginDialogOpen(true)}
+          simplified={simplified}
+          onSettingsClick={onSettingsClick}
+        />
       ) : (
         <div className="flex gap-3 justify-center">
           <Button

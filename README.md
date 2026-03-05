@@ -235,7 +235,7 @@ for (const job of myJobs) {
 ### .env
 
 - **DVM_SECRET_KEY**: hex private key (64 chars). The DVM's pubkey is derived from this.
-- **RELAYS**: optional; comma-separated relay URLs. Defaults to `wss://relay.samt.st`.
+- **RELAYS**: optional; comma-separated relay URLs. Defaults to `wss://relay.brainrot.rehab` (must match where the client publishes jobs).
 
 ### Why does the DVM have its own private key?
 
