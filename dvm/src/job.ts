@@ -172,7 +172,10 @@ export async function runJob(
   const unsigned34236 = {
     kind: VIDEO_KIND,
     created_at: Math.floor(Date.now() / 1000),
-    tags: [['url', videoUrl]],
+    tags: [
+      ['url', videoUrl],
+      ['client', 'brainrot.rehab'],
+    ],
     content: '',
   }
   await pool.publish(
