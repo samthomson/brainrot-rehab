@@ -5,7 +5,7 @@ import { Film } from 'lucide-react';
 import { LoginArea } from '@/components/auth/LoginArea';
 import { SettingsModal } from '@/components/SettingsModal';
 import { usePersistedState } from '@/hooks/usePersistedState';
-import { BRAINROT_RELAY_URL, DEFAULT_BLOSSOM_UPLOAD_URL, DEFAULT_DVM_PUBKEY } from '@/lib/dvmRelays';
+import { DEFAULT_BLOSSOM_UPLOAD_URL, DEFAULT_DVM_PUBKEY } from '@/lib/dvmRelays';
 
 const navItems = [
   { path: '/rot', label: 'Rot' },
