@@ -1,9 +1,19 @@
 import { useWebSocketImplementation } from 'nostr-tools/pool'
 import WebSocket from 'ws'
 import { SimplePool, utils } from 'nostr-tools'
+import { getPublicKey } from 'nostr-tools/pure'
 import type { NostrEvent } from 'nostr-tools/core'
 
 useWebSocketImplementation(WebSocket as any)
+
+// Prevent crash on relay "replaced: have newer event" (expected when publishing replaceable task events)
+process.on('unhandledRejection', (reason, promise) => {
+  if (String(reason).includes('replaced')) {
+    console.warn('⚠️ Relay replaceable event warning (non-fatal):', reason)
+    return
+  }
+  console.error('Unhandled rejection:', reason)
+})
 import { runJob } from './job.js'
 import { JOB_REQUEST_KIND } from './types.js'
 
@@ -16,12 +26,17 @@ if (!DVM_SECRET_KEY_HEX) {
   process.exit(1)
 }
 const secretKey = utils.hexToBytes(DVM_SECRET_KEY_HEX)
+const publicKey = getPublicKey(secretKey)
+console.log('🔑 DVM Public Key:', publicKey)
 
 const pool = new SimplePool()
 
+// Only process job requests created after DVM startup (avoid processing old requests)
+const startupTime = Math.floor(Date.now() / 1000)
+
 const sub = pool.subscribe(
   RELAYS,
-  { kinds: [JOB_REQUEST_KIND] },
+  { kinds: [JOB_REQUEST_KIND], since: startupTime },
   {
     onevent(ev: NostrEvent) {
       console.log('📥 Received job request:', {

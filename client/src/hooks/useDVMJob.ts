@@ -5,23 +5,23 @@ import { useToast } from '@/hooks/useToast';
 import type { NostrEvent } from '@nostrify/nostrify';
 
 interface DVMTask {
-  type: 'sign_nip98' | 'sign_event' | 'success' | 'error';
-  method?: string;
+  type: 'sign_blossom' | 'sign_event' | 'success' | 'error';
   url?: string;
   payload_hash?: string;
+  size?: number;
+  expiration?: number;
   event?: Partial<NostrEvent>;
   result_event_id?: string;
   message?: string;
 }
 
 interface DVMJobState {
-  status: 'idle' | 'broadcasting' | 'pending' | 'awaiting_nip98' | 'uploading' | 'awaiting_signature' | 'complete' | 'error';
+  status: 'idle' | 'broadcasting' | 'pending' | 'awaiting_blossom' | 'uploading' | 'awaiting_signature' | 'complete' | 'error';
   currentTask?: DVMTask;
   resultEventId?: string;
   errorMessage?: string;
 }
 
-/** Publish event to all relays in the pool; succeeds if at least one accepts. */
 async function publishToPool(
   nostr: { relay: (url: string) => { event: (ev: NostrEvent) => Promise<unknown> } },
   relays: string[],
@@ -52,148 +52,143 @@ export function useDVMJob(dvmPubkey: string, relays: string[]) {
   const { toast } = useToast();
   const [jobState, setJobState] = useState<DVMJobState>({ status: 'idle' });
   const [currentJobId, setCurrentJobId] = useState<string | null>(null);
-  const seenEventIds = useRef<Set<string>>(new Set());
+  
+  // Track which task event IDs we've already handled
+  const processedEventIds = useRef<Set<string>>(new Set());
+  const isProcessing = useRef<boolean>(false);
+  const eventQueue = useRef<NostrEvent[]>([]);
 
-  const handleNip98Signing = useCallback(
-    async (task: DVMTask, jobRequestId: string) => {
-      if (!user || !task.url || !task.method || !task.payload_hash) return;
-
-      try {
-        console.log('Signing NIP-98 auth event...');
-
-        const nip98Event = await user.signer.signEvent({
-          kind: 27235,
-          content: '',
-          tags: [
-            ['u', task.url],
-            ['method', task.method],
-            ['payload', task.payload_hash],
-          ],
-          created_at: Math.floor(Date.now() / 1000),
-        });
-
-        const responseEvent = await user.signer.signEvent({
-          kind: 30535,
-          content: JSON.stringify(nip98Event),
-          tags: [
-            ['e', jobRequestId],
-            ['p', dvmPubkey],
-          ],
-          created_at: Math.floor(Date.now() / 1000),
-        });
-
-        await publishToPool(nostr, relays, responseEvent);
-
-        setJobState({ status: 'uploading', currentTask: task });
-        toast({
-          title: 'Upload Authorized',
-          description: 'DVM is now uploading your video...',
-        });
-      } catch (error) {
-        console.error('Error signing NIP-98:', error);
-        toast({
-          title: 'Signing Failed',
-          description: 'Failed to sign upload authorization',
-          variant: 'destructive',
-        });
-      }
-    },
-    [user, nostr, relays, dvmPubkey, toast]
-  );
-
-  const handleEventSigning = useCallback(
-    async (task: DVMTask, jobRequestId: string) => {
-      if (!user || !task.event) return;
-
-      try {
-        const template = {
-          kind: task.event.kind!,
-          content: task.event.content ?? '',
-          tags: (task.event.tags ?? []) as [string, string][],
-          created_at: task.event.created_at ?? Math.floor(Date.now() / 1000),
-        };
-        const signedVideoEvent = await user.signer.signEvent(template);
-
-        const responseEvent = await user.signer.signEvent({
-          kind: 30535,
-          content: JSON.stringify(signedVideoEvent),
-          tags: [
-            ['e', jobRequestId],
-            ['p', dvmPubkey],
-          ],
-          created_at: Math.floor(Date.now() / 1000),
-        });
-
-        await publishToPool(nostr, relays, responseEvent);
-
-        toast({
-          title: 'Video Signed',
-          description: 'DVM is publishing your remix...',
-        });
-      } catch (error) {
-        console.error('Error signing video event:', error);
-        toast({
-          title: 'Signing Failed',
-          description: 'Failed to sign video event',
-          variant: 'destructive',
-        });
-      }
-    },
-    [user, nostr, relays, dvmPubkey, toast]
-  );
-
-  // Subscribe to task events on all relays in the pool
+  // Subscribe to task events
   useEffect(() => {
-    if (!currentJobId || !dvmPubkey || relays.length === 0) return;
+    if (!currentJobId || relays.length === 0) return;
 
-    seenEventIds.current = new Set();
-    const filter = {
-      kinds: [30534],
-      authors: [dvmPubkey],
-      '#d': [currentJobId],
-    };
-
+    const jobId = currentJobId;
+    // Subscribe to events from 2 seconds ago to ensure we don't miss any due to clock skew
+    const subscriptionTime = Math.floor(Date.now() / 1000) - 2;
+    const filter = { kinds: [30534], '#e': [jobId], since: subscriptionTime };
     const controller = new AbortController();
     const signal = controller.signal;
 
-    const handleEvent = async (taskEvent: NostrEvent) => {
-      if (seenEventIds.current.has(taskEvent.id)) return;
-      seenEventIds.current.add(taskEvent.id);
+    const processEvent = async (taskEvent: NostrEvent) => {
+      if (signal.aborted) return;
+      if (processedEventIds.current.has(taskEvent.id)) return;
+      processedEventIds.current.add(taskEvent.id);
 
       try {
         const task: DVMTask = JSON.parse(taskEvent.content);
-        setJobState({ status: 'pending', currentTask: task });
-
-        if (task.type === 'sign_nip98') {
-          setJobState({ status: 'awaiting_nip98', currentTask: task });
-          await handleNip98Signing(task, currentJobId);
-        } else if (task.type === 'sign_event') {
-          setJobState({ status: 'awaiting_signature', currentTask: task });
-          await handleEventSigning(task, currentJobId);
-        } else if (task.type === 'success') {
+        console.log(`[DVM] Handling task: ${task.type}`);
+        
+        // Terminal states - end immediately
+        if (task.type === 'success') {
+          controller.abort();
           setJobState({
             status: 'complete',
             currentTask: task,
             resultEventId: task.result_event_id,
           });
-          toast({
-            title: 'Video Complete! 🎉',
-            description: 'Your remix has been published to Nostr',
-          });
-        } else if (task.type === 'error') {
+          toast({ title: 'Video Complete! 🎉', description: 'Your remix has been published to Nostr' });
+          return;
+        }
+        
+        if (task.type === 'error') {
+          controller.abort();
           setJobState({
             status: 'error',
             currentTask: task,
             errorMessage: task.message,
           });
-          toast({
-            title: 'Job Failed',
-            description: task.message,
-            variant: 'destructive',
-          });
+          toast({ title: 'Job Failed', description: task.message, variant: 'destructive' });
+          return;
         }
+        
+        if (task.type === 'sign_blossom') {
+          if (!user || !task.url || !task.payload_hash || task.size == null || task.expiration == null) return;
+          
+          setJobState({ status: 'awaiting_blossom', currentTask: task });
+          
+          const blossomEvent = await user.signer.signEvent({
+            kind: 24242,
+            content: 'Upload remix.mp4',
+            tags: [
+              ['t', 'upload'],
+              ['x', task.payload_hash],
+              ['size', String(task.size)],
+              ['expiration', String(task.expiration)],
+            ],
+            created_at: Math.floor(Date.now() / 1000),
+          });
+
+          const responseEvent = await user.signer.signEvent({
+            kind: 30535,
+            content: JSON.stringify(blossomEvent),
+            tags: [
+              ['e', jobId],
+              ['p', taskEvent.pubkey],
+            ],
+            created_at: Math.floor(Date.now() / 1000),
+          });
+
+          await publishToPool(nostr, relays, responseEvent);
+          setJobState({ status: 'uploading', currentTask: task });
+          toast({ title: 'Upload Authorized', description: 'DVM is now uploading your video...' });
+          
+        } else if (task.type === 'sign_event') {
+          if (!user || !task.event) return;
+          
+          setJobState({ status: 'awaiting_signature', currentTask: task });
+          
+          const template = {
+            kind: task.event.kind!,
+            content: task.event.content ?? '',
+            tags: (task.event.tags ?? []) as [string, string][],
+            created_at: task.event.created_at ?? Math.floor(Date.now() / 1000),
+          };
+          const signedVideoEvent = await user.signer.signEvent(template);
+
+          // Publish the actual video event (kind 34236)
+          console.log('[Client] Publishing video event (kind 34236):', signedVideoEvent.id);
+          await publishToPool(nostr, relays, signedVideoEvent);
+
+          // Also send response to DVM so it knows we're done
+          const responseEvent = await user.signer.signEvent({
+            kind: 30535,
+            content: JSON.stringify(signedVideoEvent),
+            tags: [
+              ['e', jobId],
+              ['p', taskEvent.pubkey],
+            ],
+            created_at: Math.floor(Date.now() / 1000),
+          });
+
+          await publishToPool(nostr, relays, responseEvent);
+          setJobState({ status: 'pending', currentTask: task });
+          toast({ title: 'Video Published!', description: 'Your remix is now on Nostr' });
+        }
+        
       } catch (error) {
         console.error('Error handling task:', error);
+        toast({ title: 'Task Failed', description: String(error), variant: 'destructive' });
+      }
+    };
+    
+    const handleEvent = (taskEvent: NostrEvent) => {
+      if (signal.aborted) return;
+      if (taskEvent.pubkey === user?.pubkey) return;
+      if (processedEventIds.current.has(taskEvent.id)) return;
+      
+      // Queue the event and process
+      eventQueue.current.push(taskEvent);
+      
+      // If not currently processing, start processing the queue
+      if (!isProcessing.current) {
+        (async () => {
+          while (eventQueue.current.length > 0 && !signal.aborted) {
+            isProcessing.current = true;
+            const event = eventQueue.current.shift()!;
+            await processEvent(event);
+            isProcessing.current = false;
+          }
+        })();
       }
     };
 
@@ -212,7 +207,7 @@ export function useDVMJob(dvmPubkey: string, relays: string[]) {
     });
 
     return () => controller.abort();
-  }, [currentJobId, dvmPubkey, relays, nostr, toast, handleNip98Signing, handleEventSigning]);
+  }, [currentJobId, relays.join(','), nostr, user?.pubkey, toast]);
 
   const broadcastJob = useCallback(
     async (remixData: unknown): Promise<string | null> => {
@@ -225,6 +220,11 @@ export function useDVMJob(dvmPubkey: string, relays: string[]) {
         return null;
       }
 
+      // Reset state for new job
+      processedEventIds.current = new Set();
+      isProcessing.current = false;
+      eventQueue.current = [];
+      
       setJobState({ status: 'broadcasting' });
 
       try {
@@ -252,10 +252,15 @@ export function useDVMJob(dvmPubkey: string, relays: string[]) {
         };
 
         const signedEvent = await user.signer.signEvent(unsignedEvent);
-        await publishToPool(nostr, relays, signedEvent);
-
+        
+        // Set job ID BEFORE publishing
         setCurrentJobId(signedEvent.id);
         setJobState({ status: 'pending' });
+        
+        // Small delay to ensure subscription is established
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        await publishToPool(nostr, relays, signedEvent);
 
         toast({
           title: 'Job Broadcasted! 📡',
@@ -283,6 +288,9 @@ export function useDVMJob(dvmPubkey: string, relays: string[]) {
     resetJob: () => {
       setCurrentJobId(null);
       setJobState({ status: 'idle' });
+      processedEventIds.current = new Set();
+      isProcessing.current = false;
+      eventQueue.current = [];
     },
   };
 }

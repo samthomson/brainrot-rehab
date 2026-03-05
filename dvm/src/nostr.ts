@@ -40,7 +40,8 @@ export function buildTaskEvent(
     kind: TASK_KIND,
     created_at: Math.floor(Date.now() / 1000),
     tags: [
-      ['d', requestId],
+      ['d', `${requestId}:${task.type}`],
+      ['e', requestId],
       ['p', customerPubkey],
     ],
     content: JSON.stringify(task),

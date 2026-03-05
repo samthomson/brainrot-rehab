@@ -21,6 +21,7 @@ function waitForTaskResponse(
   customerPubkey: string,
   timeoutMs: number
 ): Promise<NostrEvent> {
+  const since = Math.floor(Date.now() / 1000)
   return new Promise((resolve, reject) => {
     const t = setTimeout(() => {
       sub.close()
@@ -28,7 +29,7 @@ function waitForTaskResponse(
     }, timeoutMs)
     const sub = pool.subscribe(
       relays,
-      { kinds: [TASK_RESPONSE_KIND], authors: [customerPubkey], '#e': [requestId] },
+      { kinds: [TASK_RESPONSE_KIND], authors: [customerPubkey], '#e': [requestId], since },
       {
         onevent(ev) {
           clearTimeout(t)
@@ -85,17 +86,21 @@ export async function runJob(
   }
 
   const payloadHash = createHash('sha256').update(videoBuffer).digest('hex')
-  const blossomUrl = payload.blossom_upload_url
+  const blossomBaseUrl = payload.blossom_upload_url.replace(/\/$/, '')
+  const blossomUploadUrl = blossomBaseUrl.endsWith('/upload') ? blossomBaseUrl : `${blossomBaseUrl}/upload`
 
+  const now = Math.floor(Date.now() / 1000)
+  const expiration = now + 60
   const taskEvent = buildTaskEvent(requestId, customerPubkey, {
-    type: 'sign_nip98',
-    method: 'POST',
-    url: blossomUrl,
+    type: 'sign_blossom',
+    url: blossomUploadUrl,
     payload_hash: payloadHash,
+    size: videoBuffer.length,
+    expiration,
   })
   await pool.publish(relays, signEvent(taskEvent, secretKey))
-  console.log(`⏳ Waiting for user to sign NIP-98 auth event (120s timeout)`)
-  console.log(`   Upload URL: ${blossomUrl}`)
+  console.log(`⏳ Waiting for user to sign Blossom auth event (120s timeout)`)
+  console.log(`   Upload URL: ${blossomUploadUrl}`)
   console.log(`   Payload hash: ${payloadHash}`)
 
   let nip98Response: NostrEvent
@@ -128,12 +133,19 @@ export async function runJob(
     return
   }
   const nip98Token = Buffer.from(JSON.stringify(nip98AuthEvent)).toString('base64')
-  const uploadRes = await fetch(blossomUrl, {
-    method: 'POST',
+  console.log(`📤 Uploading to Blossom: ${blossomUploadUrl}`)
+  console.log(`   NIP-98 auth pubkey: ${nip98AuthEvent.pubkey}`)
+  console.log(`   Video size: ${(videoBuffer.length / 1024 / 1024).toFixed(2)} MB`)
+  
+  const uploadRes = await fetch(blossomUploadUrl, {
+    method: 'PUT',
     headers: { Authorization: `Nostr ${nip98Token}`, 'Content-Type': 'video/mp4' },
     body: new Uint8Array(videoBuffer),
   })
   if (!uploadRes.ok) {
+    const errorBody = await uploadRes.text().catch(() => '')
+    console.error(`❌ Blossom upload failed: ${uploadRes.status} ${uploadRes.statusText}`)
+    console.error(`   Response: ${errorBody}`)
     await pool.publish(
       relays,
       signEvent(
@@ -146,7 +158,16 @@ export async function runJob(
     )
     return
   }
-  const videoUrl = uploadRes.headers.get('location') || (await uploadRes.text()) || blossomUrl
+  console.log(`✅ Blossom upload successful`)
+  let videoUrl: string
+  const contentType = uploadRes.headers.get('content-type') || ''
+  if (contentType.includes('application/json')) {
+    const data = (await uploadRes.json()) as { url?: string }
+    videoUrl = data.url || blossomUploadUrl
+  } else {
+    videoUrl = uploadRes.headers.get('location') || (await uploadRes.text()) || blossomUploadUrl
+  }
+  console.log(`   Video URL: ${videoUrl}`)
 
   const unsigned34236 = {
     kind: VIDEO_KIND,
@@ -178,11 +199,19 @@ export async function runJob(
     return
   }
 
+  console.log(`Job ${requestId}: received response event:`, {
+    id: signEventResponse.id,
+    kind: signEventResponse.kind,
+    content_preview: signEventResponse.content.slice(0, 200)
+  })
+  
   const signedContent = signEventResponse.content
   let signedEv: NostrEvent
   try {
     signedEv = JSON.parse(signedContent) as NostrEvent
-  } catch {
+  } catch (err) {
+    console.error(`Job ${requestId}: failed to parse signed event:`, err)
+    console.error(`   Content:`, signedContent)
     await pool.publish(
       relays,
       signEvent(
@@ -193,15 +222,32 @@ export async function runJob(
     return
   }
 
-  await pool.publish(relays, signedEv)
-  await pool.publish(
-    relays,
-    signEvent(
-      buildTaskEvent(requestId, customerPubkey, { type: 'success', result_event_id: signedEv.id }),
-      secretKey
-    )
-  )
+  console.log(`Job ${requestId}: parsed signed event:`, {
+    id: signedEv.id,
+    kind: signedEv.kind,
+    pubkey: signedEv.pubkey,
+    tags: signedEv.tags,
+    content: signedEv.content
+  })
   
+  console.log(`Job ${requestId}: publishing signed video (kind ${VIDEO_KIND})`)
+  console.log(`   Event ID: ${signedEv.id}`)
+  console.log(`   Pubkey: ${signedEv.pubkey}`)
+  console.log(`   Tags:`, signedEv.tags)
+  
+  const publishResults = await Promise.allSettled(pool.publish(relays, signedEv))
+  const rejected = publishResults.filter(r => r.status === 'rejected')
+  if (rejected.length > 0) {
+    console.error(`⚠️ Some relays rejected video event:`, rejected.map(r => (r as PromiseRejectedResult).reason))
+  }
+  
+  console.log(`Job ${requestId}: publishing success task`)
+  const successEvent = signEvent(
+    buildTaskEvent(requestId, customerPubkey, { type: 'success', result_event_id: signedEv.id }),
+    secretKey
+  )
+  await pool.publish(relays, successEvent)
+
   // Build tags for all original events and authors
   const extraTags: string[][] = []
   for (const clip of payload.clips) {

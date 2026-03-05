@@ -37,6 +37,7 @@ export interface JobRequestPayload {
 /** Replaceable task event content: what the user must do next */
 export type TaskPayload =
   | { type: 'sign_nip98'; method: string; url: string; payload_hash: string }
+  | { type: 'sign_blossom'; url: string; payload_hash: string; size: number; expiration: number }
   | { type: 'sign_event'; event: Record<string, unknown> }
   | { type: 'success'; result_event_id?: string }
   | { type: 'error'; message: string }

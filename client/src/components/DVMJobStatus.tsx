@@ -4,7 +4,7 @@ import { Loader2, CheckCircle, XCircle, Upload, FileSignature, Radio, X } from '
 import { Progress } from '@/components/ui/progress';
 
 interface DVMJobStatusProps {
-  status: 'idle' | 'broadcasting' | 'pending' | 'awaiting_nip98' | 'uploading' | 'awaiting_signature' | 'complete' | 'error';
+  status: 'idle' | 'broadcasting' | 'pending' | 'awaiting_blossom' | 'uploading' | 'awaiting_signature' | 'complete' | 'error';
   currentTask?: {
     type: string;
     message?: string;
@@ -18,7 +18,7 @@ const STATUS_CONFIG = {
   idle: { label: 'Ready', icon: Radio, color: 'text-muted-foreground', progress: 0 },
   broadcasting: { label: 'Broadcasting...', icon: Loader2, color: 'text-blue-500', progress: 10 },
   pending: { label: 'Waiting for DVM...', icon: Loader2, color: 'text-blue-500', progress: 20 },
-  awaiting_nip98: { label: 'Needs Upload Auth', icon: FileSignature, color: 'text-yellow-500', progress: 40 },
+  awaiting_blossom: { label: 'Needs Upload Auth', icon: FileSignature, color: 'text-yellow-500', progress: 40 },
   uploading: { label: 'Uploading Video...', icon: Upload, color: 'text-blue-500', progress: 60 },
   awaiting_signature: { label: 'Needs Video Signature', icon: FileSignature, color: 'text-yellow-500', progress: 80 },
   complete: { label: 'Complete!', icon: CheckCircle, color: 'text-green-500', progress: 100 },
@@ -64,13 +64,33 @@ export function DVMJobStatus({ status, currentTask, resultEventId, errorMessage,
         )}
 
         {resultEventId && (
-          <div className="bg-muted p-3 rounded-lg">
-            <p className="text-xs text-muted-foreground mb-1">Result Event ID:</p>
-            <code className="text-xs break-all">{resultEventId}</code>
+          <div className="bg-muted p-3 rounded-lg space-y-2">
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">Video Event ID:</p>
+              <code className="text-xs break-all">{resultEventId}</code>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => window.open(`https://njump.me/${resultEventId}`, '_blank')}
+              >
+                View on njump
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  navigator.clipboard.writeText(resultEventId);
+                }}
+              >
+                Copy ID
+              </Button>
+            </div>
           </div>
         )}
 
-        {status === 'awaiting_nip98' && (
+        {status === 'awaiting_blossom' && (
           <div className="bg-yellow-500/10 border border-yellow-500/20 p-3 rounded-lg">
             <p className="text-sm">
               <strong>Action Required:</strong> The DVM needs authorization to upload your video.

@@ -19,7 +19,7 @@ import { RelaySelector } from '@/components/RelaySelector';
 import { BroadcastButton } from '@/components/BroadcastButton';
 import { DVMJobStatus } from '@/components/DVMJobStatus';
 import { useDVMJob } from '@/hooks/useDVMJob';
-import { BRAINROT_RELAY_URL, DEFAULT_BLOSSOM_UPLOAD_URL } from '@/lib/dvmRelays';
+import { BRAINROT_RELAY_URL, DEFAULT_BLOSSOM_UPLOAD_URL, DEFAULT_DVM_PUBKEY } from '@/lib/dvmRelays';
 import type { Video, SourceVideo, TimelineSegment, RemixData } from '@/types/video';
 
 const Index = () => {
@@ -41,7 +41,12 @@ const Index = () => {
   const [additionalRelays, setAdditionalRelays] = usePersistedState<string[]>('video-remix-additional-relays', []);
   const relayPool = [BRAINROT_RELAY_URL, ...additionalRelays];
   const [blossomUploadUrl, setBlossomUploadUrl] = usePersistedState<string>('video-remix-blossom-url', DEFAULT_BLOSSOM_UPLOAD_URL);
-  const [dvmPubkey, setDvmPubkey] = usePersistedState<string>('video-remix-dvm-pubkey', '');
+  const [dvmPubkey, setDvmPubkey] = usePersistedState<string>('video-remix-dvm-pubkey', DEFAULT_DVM_PUBKEY);
+  
+  // Force update DVM pubkey if it's empty (migration from old localStorage)
+  if (!dvmPubkey) {
+    setDvmPubkey(DEFAULT_DVM_PUBKEY);
+  }
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [isClearDialogOpen, setIsClearDialogOpen] = useState(false);
   const [isBlocklistOpen, setIsBlocklistOpen] = useState(false);
@@ -335,7 +340,7 @@ const Index = () => {
                   <BroadcastButton
                     remixData={remixDataSlim}
                     onBroadcast={() => broadcastJob(remixDataSlim)}
-                    disabled={timelineSegments.length === 0}
+                    disabled={timelineSegments.length === 0 || (jobState.status !== 'idle' && jobState.status !== 'error')}
                     isLoading={jobState.status === 'broadcasting'}
                   />
                   
