@@ -65,7 +65,12 @@ export function useDVMJob(dvmPubkey: string, relays: string[]) {
     const jobId = currentJobId;
     // Subscribe to events from 2 seconds ago to ensure we don't miss any due to clock skew
     const subscriptionTime = Math.floor(Date.now() / 1000) - 2;
-    const filter = { kinds: [30534], '#e': [jobId], since: subscriptionTime };
+    const filter = { 
+      kinds: [30534], 
+      '#e': [jobId], 
+      authors: [dvmPubkey],
+      since: subscriptionTime 
+    };
     const controller = new AbortController();
     const signal = controller.signal;
 
