@@ -8,7 +8,6 @@ import { VideoPickerModal } from '@/components/VideoPickerModal';
 import { ClearAllDialog } from '@/components/ClearAllDialog';
 import { BlocklistManager } from '@/components/BlocklistManager';
 import { usePersistedState } from '@/hooks/usePersistedState';
-import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Eye, FileJson } from 'lucide-react';
 import { useToast } from '@/hooks/useToast';
@@ -16,6 +15,7 @@ import { BroadcastButton } from '@/components/BroadcastButton';
 import { DVMJobStatus } from '@/components/DVMJobStatus';
 import { useDVMJob } from '@/hooks/useDVMJob';
 import { BRAINROT_RELAY_URL, DEFAULT_BLOSSOM_UPLOAD_URL, DEFAULT_DVM_PUBKEY } from '@/lib/dvmRelays';
+import type { NostrEvent } from '@nostrify/nostrify';
 import type { Video, SourceVideo, TimelineSegment, RemixData } from '@/types/video';
 
 export default function RehabPage() {
@@ -34,9 +34,9 @@ export default function RehabPage() {
   const [sourceSegments, setSourceSegments] = usePersistedState<SourceSegment[]>('video-remix-source-segments', []);
   const [timelineSegments, setTimelineSegments] = usePersistedState<TimelineSegment[]>('video-remix-timeline', []);
   const [blocklist, setBlocklist] = usePersistedState<string[]>('video-remix-blocklist', []);
-  const [additionalRelays, setAdditionalRelays] = usePersistedState<string[]>('video-remix-additional-relays', []);
+  const [additionalRelays] = usePersistedState<string[]>('video-remix-additional-relays', []);
   const relayPool = [BRAINROT_RELAY_URL, ...additionalRelays];
-  const [blossomUploadUrl, setBlossomUploadUrl] = usePersistedState<string>('video-remix-blossom-url', DEFAULT_BLOSSOM_UPLOAD_URL);
+  const [blossomUploadUrl] = usePersistedState<string>('video-remix-blossom-url', DEFAULT_BLOSSOM_UPLOAD_URL);
   const [dvmPubkey, setDvmPubkey] = usePersistedState<string>('video-remix-dvm-pubkey', DEFAULT_DVM_PUBKEY);
 
   if (!dvmPubkey) {
@@ -179,7 +179,7 @@ export default function RehabPage() {
         startTime: seg.startTime,
         endTime: seg.endTime,
         duration: seg.duration,
-        originalEvent: sourceVideo?.event || ({} as any),
+        originalEvent: sourceVideo?.event ?? ({} as NostrEvent),
       };
     }),
     totalDuration: timelineSegments.reduce((sum, seg) => sum + seg.duration, 0),
@@ -249,7 +249,7 @@ export default function RehabPage() {
                 <div className="space-y-4">
                   <BroadcastButton
                     remixData={remixDataSlim}
-                    onBroadcast={() => broadcastJob(remixDataSlim)}
+                    onBroadcast={async () => { await broadcastJob(remixDataSlim); }}
                     disabled={timelineSegments.length === 0 || (jobState.status !== 'idle' && jobState.status !== 'error')}
                     isLoading={jobState.status === 'broadcasting'}
                   />
