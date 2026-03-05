@@ -9,6 +9,8 @@ import { ClearAllDialog } from '@/components/ClearAllDialog';
 import { BlocklistManager } from '@/components/BlocklistManager';
 import { usePersistedState } from '@/hooks/usePersistedState';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Eye, FileJson } from 'lucide-react';
 import { useToast } from '@/hooks/useToast';
 import { BroadcastButton } from '@/components/BroadcastButton';
@@ -42,6 +44,7 @@ export default function RehabPage() {
   if (!dvmPubkey) {
     setDvmPubkey(DEFAULT_DVM_PUBKEY);
   }
+  const [caption, setCaption] = useState('');
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [isClearDialogOpen, setIsClearDialogOpen] = useState(false);
   const [isBlocklistOpen, setIsBlocklistOpen] = useState(false);
@@ -197,6 +200,7 @@ export default function RehabPage() {
       };
     }),
     blossom_upload_url: blossomUploadUrl,
+    caption: caption.trim() || undefined,
   };
 
   return (
@@ -243,23 +247,41 @@ export default function RehabPage() {
                 </TabsTrigger>
               </TabsList>
               <TabsContent value="preview" className="mt-4">
-                <RemixPreview segments={timelineSegments} sourceVideos={sourceVideos} />
+                <div className="space-y-4">
+                  <RemixPreview segments={timelineSegments} sourceVideos={sourceVideos} />
+                  {timelineSegments.length > 0 && (
+                    <div className="space-y-3">
+                      <div className="space-y-2">
+                        <Label htmlFor="caption">Caption</Label>
+                        <Input
+                          id="caption"
+                          placeholder="Add a caption for your video..."
+                          value={caption}
+                          onChange={(e) => setCaption(e.target.value)}
+                          className="max-w-md"
+                        />
+                      </div>
+                      <BroadcastButton
+                        remixData={remixDataSlim}
+                        onBroadcast={() => broadcastJob(remixDataSlim)}
+                        disabled={jobState.status !== 'idle' && jobState.status !== 'error'}
+                        isLoading={jobState.status === 'broadcasting'}
+                        label="Publish"
+                        loadingLabel="Publishing..."
+                      />
+                      <DVMJobStatus
+                        status={jobState.status}
+                        currentTask={jobState.currentTask}
+                        resultEventId={jobState.resultEventId}
+                        errorMessage={jobState.errorMessage}
+                        onReset={resetJob}
+                      />
+                    </div>
+                  )}
+                </div>
               </TabsContent>
               <TabsContent value="json" className="mt-4">
                 <div className="space-y-4">
-                  <BroadcastButton
-                    remixData={remixDataSlim}
-                    onBroadcast={async () => { await broadcastJob(remixDataSlim); }}
-                    disabled={timelineSegments.length === 0 || (jobState.status !== 'idle' && jobState.status !== 'error')}
-                    isLoading={jobState.status === 'broadcasting'}
-                  />
-                  <DVMJobStatus
-                    status={jobState.status}
-                    currentTask={jobState.currentTask}
-                    resultEventId={jobState.resultEventId}
-                    errorMessage={jobState.errorMessage}
-                    onReset={resetJob}
-                  />
                   <DVMPayloadViewer data={remixDataSlim} title="DVM Payload (What Gets Sent)" />
                   <DVMPayloadViewer data={remixDataFull} title="Full Data (Reference Only)" />
                 </div>

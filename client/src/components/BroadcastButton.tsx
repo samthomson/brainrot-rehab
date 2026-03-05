@@ -6,10 +6,19 @@ interface BroadcastButtonProps {
   onBroadcast: () => Promise<void>;
   disabled?: boolean;
   isLoading?: boolean;
+  label?: string;
+  loadingLabel?: string;
 }
 
-export function BroadcastButton({ remixData, onBroadcast, disabled, isLoading }: BroadcastButtonProps) {
-  const segments = (remixData as any).segments || [];
+export function BroadcastButton({
+  remixData,
+  onBroadcast,
+  disabled,
+  isLoading,
+  label = 'Broadcast to DVM',
+  loadingLabel = 'Broadcasting...',
+}: BroadcastButtonProps) {
+  const segments = (remixData as { segments?: unknown[] })?.segments ?? [];
   const hasSegments = segments.length > 0;
 
   return (
@@ -22,12 +31,12 @@ export function BroadcastButton({ remixData, onBroadcast, disabled, isLoading }:
       {isLoading ? (
         <>
           <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-          Broadcasting...
+          {loadingLabel}
         </>
       ) : (
         <>
           <Send className="h-4 w-4 mr-2" />
-          Broadcast to DVM
+          {label}
         </>
       )}
     </Button>

@@ -58,6 +58,8 @@ export function useDVMJob(dvmPubkey: string, relays: string[]) {
   const processedEventIds = useRef<Set<string>>(new Set());
   const isProcessing = useRef<boolean>(false);
   const eventQueue = useRef<NostrEvent[]>([]);
+  // Store caption from broadcast - client is source of truth (DVM may not pass it through)
+  const lastBroadcastRef = useRef<{ caption?: string }>({});
 
   // Subscribe to task events
   useEffect(() => {
@@ -143,14 +145,22 @@ export function useDVMJob(dvmPubkey: string, relays: string[]) {
           
           setJobState({ status: 'awaiting_signature', currentTask: task });
           
-          // Ensure client tag is present - DVM sends it but ensure we never publish without it
           let tags = (task.event.tags ?? []) as [string, string][];
-          if (task.event.kind === 34236 && !tags.some(([n]) => n === 'client')) {
-            tags = [...tags, ['client', BRAINROT_CLIENT_TAG]];
+          // CRITICAL: Kind 34236 is parameterized replaceable - without unique d tag, each video overwrites the last
+          if (task.event.kind === 34236) {
+            tags = tags.filter(([n]) => n !== 'd');
+            tags = [['d', jobId], ...tags];
+            if (!tags.some(([n]) => n === 'client')) {
+              tags = [...tags, ['client', BRAINROT_CLIENT_TAG]];
+            }
           }
+          // Caption: use our stored value from broadcast (source of truth), fallback to DVM
+          const storedCaption = lastBroadcastRef.current?.caption;
+          const dvmContent = typeof task.event.content === 'string' ? task.event.content : '';
+          const content = (storedCaption?.trim() || dvmContent) || '';
           const template = {
             kind: task.event.kind!,
-            content: task.event.content ?? '',
+            content,
             tags,
             created_at: task.event.created_at ?? Math.floor(Date.now() / 1000),
           };
@@ -221,14 +231,14 @@ export function useDVMJob(dvmPubkey: string, relays: string[]) {
   }, [currentJobId, relays.join(','), nostr, user?.pubkey, toast]);
 
   const broadcastJob = useCallback(
-    async (remixData: unknown): Promise<string | null> => {
+    async (remixData: unknown): Promise<void> => {
       if (!user) {
         toast({
           title: 'Login Required',
           description: 'Please login with Nostr to broadcast job requests',
           variant: 'destructive',
         });
-        return null;
+        return;
       }
 
       // Reset state for new job
@@ -264,6 +274,10 @@ export function useDVMJob(dvmPubkey: string, relays: string[]) {
 
         const signedEvent = await user.signer.signEvent(unsignedEvent);
         
+        // Store caption for when we receive sign_event task (client is source of truth)
+        const caption = (remixData as { caption?: string }).caption;
+        lastBroadcastRef.current = { caption };
+        
         // Set job ID BEFORE publishing
         setCurrentJobId(signedEvent.id);
         setJobState({ status: 'pending' });
@@ -277,8 +291,6 @@ export function useDVMJob(dvmPubkey: string, relays: string[]) {
           title: 'Job Broadcasted! 📡',
           description: 'DVM is starting to process your remix...',
         });
-
-        return signedEvent.id;
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
         setJobState({ status: 'error', errorMessage });
@@ -287,7 +299,6 @@ export function useDVMJob(dvmPubkey: string, relays: string[]) {
           description: errorMessage,
           variant: 'destructive',
         });
-        return null;
       }
     },
     [user, nostr, relays, toast]
@@ -302,6 +313,7 @@ export function useDVMJob(dvmPubkey: string, relays: string[]) {
       processedEventIds.current = new Set();
       isProcessing.current = false;
       eventQueue.current = [];
+      lastBroadcastRef.current = {};
     },
   };
 }

@@ -22,10 +22,13 @@ function parseBrainrotVideoEvent(event: NostrEvent): Video | null {
     const urlTag = event.tags.find(([name]) => name === 'url')?.[1];
     if (!urlTag) return null;
 
+    const caption = typeof event.content === 'string' ? event.content.trim() : '';
+    const name = caption || `Video by ${event.pubkey.slice(0, 8)}...`;
+
     return {
       id: event.id,
       event,
-      name: `Video by ${event.pubkey.slice(0, 8)}...`,
+      name,
       url: urlTag,
       duration: 0,
       thumbnailUrl: undefined,

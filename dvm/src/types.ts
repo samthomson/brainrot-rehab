@@ -32,6 +32,7 @@ export interface Segment {
 export interface JobRequestPayload {
   segments: Segment[]
   blossom_upload_url: string
+  caption?: string
 }
 
 /** Replaceable task event content: what the user must do next */

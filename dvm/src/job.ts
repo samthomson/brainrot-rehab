@@ -169,14 +169,16 @@ export async function runJob(
   }
   console.log(`   Video URL: ${videoUrl}`)
 
+  // Kind 34236 is parameterized replaceable - need unique d tag or each new video overwrites the previous
   const unsigned34236 = {
     kind: VIDEO_KIND,
     created_at: Math.floor(Date.now() / 1000),
     tags: [
+      ['d', requestId],
       ['url', videoUrl],
       ['client', 'brainrot.rehab'],
     ],
-    content: '',
+    content: payload.caption ?? '',
   }
   await pool.publish(
     relays,
