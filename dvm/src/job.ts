@@ -172,7 +172,15 @@ export async function runJob(
   } else {
     videoUrl = uploadRes.headers.get('location') || (await uploadRes.text()) || blossomUploadUrl
   }
-  console.log(`   Video URL: ${videoUrl}`)
+  
+  // Fix: Blossom server returns http:// even when accessed via https://
+  // Rewrite to match the protocol of the upload URL
+  if (videoUrl.startsWith('http://') && blossomUploadUrl.startsWith('https://')) {
+    videoUrl = videoUrl.replace('http://', 'https://')
+    console.log(`   Video URL (rewritten to HTTPS): ${videoUrl}`)
+  } else {
+    console.log(`   Video URL: ${videoUrl}`)
+  }
 
   // Kind 34236 is parameterized replaceable - need unique d tag or each new video overwrites the previous
   const unsigned34236 = {
