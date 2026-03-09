@@ -46,44 +46,49 @@ function runFfmpeg(args: string[], cwd: string): Promise<void> {
  * Caller must delete the workDir when done (or we could return buffer and cleanup here).
  */
 export async function composeVideo(clips: ResolvedClip[], workDir: string): Promise<string> {
-  const parts: string[] = []
+  // Download all clips
+  const inputs: string[] = []
   for (let i = 0; i < clips.length; i++) {
     const clip = clips[i]
     const ext = clip.source.includes('?') ? '.mp4' : (clip.source.split('.').pop()?.slice(0, 4) || 'mp4')
     const inputPath = join(workDir, `input_${i}${ext}`)
     await download(clip.source, inputPath)
-    const duration = clip.end_s - clip.start_s
-    const partPath = join(workDir, `part_${i}.mp4`)
-    await runFfmpeg(
-      [
-        '-ss', String(clip.start_s),
-        '-i', inputPath,
-        '-t', String(duration),
-        '-c:v', 'libx264',
-        '-preset', 'fast',
-        '-crf', '23',
-        '-c:a', 'aac',
-        '-b:a', '128k',
-        partPath
-      ],
-      workDir
-    )
-    parts.push(partPath)
+    inputs.push(inputPath)
   }
-  const listPath = join(workDir, 'list.txt')
-  await writeFile(listPath, parts.map((p) => `file '${p}'`).join('\n'))
-  const outPath = join(workDir, 'out.mp4')
-  await runFfmpeg([
-    '-f', 'concat',
-    '-safe', '0',
-    '-i', 'list.txt',
+
+  // Build filter_complex for trimming, scaling, and concatenating all clips in one pass
+  const filterParts: string[] = []
+  const concatInputs: string[] = []
+  
+  for (let i = 0; i < clips.length; i++) {
+    const clip = clips[i]
+    // Trim, scale to 720x1280 (9:16), and normalize each clip
+    filterParts.push(`[${i}:v]trim=start=${clip.start_s}:end=${clip.end_s},setpts=PTS-STARTPTS,scale=720:1280:force_original_aspect_ratio=decrease,pad=720:1280:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30[v${i}]`)
+    filterParts.push(`[${i}:a]atrim=start=${clip.start_s}:end=${clip.end_s},asetpts=PTS-STARTPTS,aresample=44100[a${i}]`)
+    concatInputs.push(`[v${i}][a${i}]`)
+  }
+  
+  // Concat all trimmed clips
+  const filterComplex = [
+    ...filterParts,
+    `${concatInputs.join('')}concat=n=${clips.length}:v=1:a=1[outv][outa]`
+  ].join(';')
+
+  const ffmpegArgs = [
+    ...inputs.flatMap(input => ['-i', input]),
+    '-filter_complex', filterComplex,
+    '-map', '[outv]',
+    '-map', '[outa]',
     '-c:v', 'libx264',
     '-preset', 'fast',
     '-crf', '23',
     '-c:a', 'aac',
     '-b:a', '128k',
     'out.mp4'
-  ], workDir)
+  ]
+
+  const outPath = join(workDir, 'out.mp4')
+  await runFfmpeg(ffmpegArgs, workDir)
   return outPath
 }
 
