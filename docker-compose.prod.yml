@@ -7,8 +7,8 @@ services:
       context: ./client
       dockerfile: Dockerfile.prod
     restart: always
-    ports:
-      - "3000:3000"
+    expose:
+      - "3000"
     networks:
       - dokploy-network
 
