@@ -118,28 +118,33 @@ export async function runJob(
     return
   }
 
-  // Client sends signed NIP-98 auth event (kind 27235) as JSON in task response content
-  let nip98AuthEvent: NostrEvent
+  // Client sends signed Blossom auth event (kind 24242) as JSON in task response content
+  let blossomAuthEvent: NostrEvent
   try {
-    nip98AuthEvent = JSON.parse(nip98Response.content) as NostrEvent
+    blossomAuthEvent = JSON.parse(nip98Response.content) as NostrEvent
   } catch {
     await pool.publish(
       relays,
       signEvent(
-        buildTaskEvent(requestId, customerPubkey, { type: 'error', message: 'Invalid NIP-98 response' }),
+        buildTaskEvent(requestId, customerPubkey, { type: 'error', message: 'Invalid Blossom auth response' }),
         secretKey
       )
     )
     return
   }
-  const nip98Token = Buffer.from(JSON.stringify(nip98AuthEvent)).toString('base64')
   console.log(`📤 Uploading to Blossom: ${blossomUploadUrl}`)
-  console.log(`   NIP-98 auth pubkey: ${nip98AuthEvent.pubkey}`)
+  console.log(`   Blossom auth event:`, JSON.stringify(blossomAuthEvent, null, 2))
   console.log(`   Video size: ${(videoBuffer.length / 1024 / 1024).toFixed(2)} MB`)
+
+  const blossomToken = Buffer.from(JSON.stringify(blossomAuthEvent)).toString('base64')
   
   const uploadRes = await fetch(blossomUploadUrl, {
     method: 'PUT',
-    headers: { Authorization: `Nostr ${nip98Token}`, 'Content-Type': 'video/mp4' },
+    headers: {
+      Authorization: `Nostr ${blossomToken}`,
+      'Content-Type': 'video/mp4',
+      'X-SHA-256': payloadHash, // Required by BUD-11 for upload authorization
+    },
     body: new Uint8Array(videoBuffer),
   })
   if (!uploadRes.ok) {
