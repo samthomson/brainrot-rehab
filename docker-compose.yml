@@ -12,6 +12,7 @@ services:
       - relaykit-proto_default
     extra_hosts:
       - "relay.local:host-gateway"
+      - "blossom.local:host-gateway"
 
   client:
     build: ./client
