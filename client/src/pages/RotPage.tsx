@@ -45,12 +45,14 @@ export default function RotPage() {
                 <VideoCard key={video.id} video={video} />
               ))}
             </div>
-            <details className="mt-8 p-4 bg-muted rounded-lg">
-              <summary className="cursor-pointer font-semibold">Debug: Raw Events</summary>
-              <pre className="mt-4 text-xs overflow-auto max-h-96">
-                {JSON.stringify(videos.map(v => v.event), null, 2)}
-              </pre>
-            </details>
+            {import.meta.env.DEV && (
+              <details className="mt-8 p-4 bg-muted rounded-lg">
+                <summary className="cursor-pointer font-semibold">Debug: Raw Events</summary>
+                <pre className="mt-4 text-xs overflow-auto max-h-96">
+                  {JSON.stringify(videos.map(v => v.event), null, 2)}
+                </pre>
+              </details>
+            )}
           </>
         )}
     </div>
