@@ -5,7 +5,6 @@ WORKDIR /app
 COPY package.json package-lock.json* ./
 RUN npm ci
 COPY src ./src
-RUN npm run build
 RUN chown -R node:node /app
 USER node
-CMD ["npm", "start"]
+CMD ["npx", "tsx", "src/index.ts"]
