@@ -55,7 +55,17 @@ export async function composeVideo(clips: ResolvedClip[], workDir: string): Prom
     const duration = clip.end_s - clip.start_s
     const partPath = join(workDir, `part_${i}.mp4`)
     await runFfmpeg(
-      ['-i', inputPath, '-ss', String(clip.start_s), '-t', String(duration), '-c', 'copy', partPath],
+      [
+        '-ss', String(clip.start_s),
+        '-i', inputPath,
+        '-t', String(duration),
+        '-c:v', 'libx264',
+        '-preset', 'fast',
+        '-crf', '23',
+        '-c:a', 'aac',
+        '-b:a', '128k',
+        partPath
+      ],
       workDir
     )
     parts.push(partPath)
@@ -63,7 +73,17 @@ export async function composeVideo(clips: ResolvedClip[], workDir: string): Prom
   const listPath = join(workDir, 'list.txt')
   await writeFile(listPath, parts.map((p) => `file '${p}'`).join('\n'))
   const outPath = join(workDir, 'out.mp4')
-  await runFfmpeg(['-f', 'concat', '-safe', '0', '-i', 'list.txt', '-c', 'copy', 'out.mp4'], workDir)
+  await runFfmpeg([
+    '-f', 'concat',
+    '-safe', '0',
+    '-i', 'list.txt',
+    '-c:v', 'libx264',
+    '-preset', 'fast',
+    '-crf', '23',
+    '-c:a', 'aac',
+    '-b:a', '128k',
+    'out.mp4'
+  ], workDir)
   return outPath
 }
 
