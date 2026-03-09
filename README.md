@@ -243,6 +243,18 @@ The DVM is a Nostr actor. It publishes events (feedback, tasks, results) that mu
 
 ---
 
+## Production (Dokploy)
+
+Deploy with `docker-compose.prod.yml`:
+
+1. Create a Compose application in Dokploy, set compose path to `./docker-compose.prod.yml`
+2. Set env vars: `DVM_SECRET_KEY` (required), `DOMAIN` (e.g. brainrot.rehab), optionally `RELAYS`
+3. Deploy
+
+Or use Dokploy Domains UI and remove the Traefik labels from the client service.
+
+---
+
 ## Development
 
 - **Auto-reload:** `tsx watch` in docker-compose detects file changes

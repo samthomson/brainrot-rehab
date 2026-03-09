@@ -1,0 +1,41 @@
+# Production compose for Dokploy deployment
+#
+# Required env vars (set in Dokploy):
+#   DVM_SECRET_KEY - hex private key (64 chars) for the DVM
+#   DOMAIN         - your domain (e.g. brainrot.rehab) for Traefik routing
+#
+# Optional:
+#   RELAYS - comma-separated relay URLs (default: wss://relay.brainrot.rehab)
+#
+# Alternative: Use Dokploy Domains UI instead of DOMAIN env - then remove the
+# traefik labels from the client service.
+
+services:
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile.prod
+    restart: always
+    networks:
+      - dokploy-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.brainrot-client.rule=Host(`${DOMAIN}`)"
+      - "traefik.http.routers.brainrot-client.entrypoints=websecure"
+      - "traefik.http.routers.brainrot-client.tls.certResolver=letsencrypt"
+      - "traefik.http.services.brainrot-client.loadbalancer.server.port=80"
+
+  dvm:
+    build:
+      context: ./dvm
+      dockerfile: Dockerfile.prod
+    restart: always
+    environment:
+      - RELAYS=${RELAYS:-wss://relay.brainrot.rehab}
+      - DVM_SECRET_KEY=${DVM_SECRET_KEY}
+    networks:
+      - dokploy-network
+
+networks:
+  dokploy-network:
+    external: true
