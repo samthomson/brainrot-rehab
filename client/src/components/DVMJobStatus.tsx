@@ -1,7 +1,10 @@
+import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Loader2, CheckCircle, XCircle, Upload, FileSignature, Radio, X } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
+
+const PENDING_STALE_MS = 90_000;
 
 interface DVMJobStatusProps {
   status: 'idle' | 'broadcasting' | 'pending' | 'awaiting_blossom' | 'uploading' | 'awaiting_signature' | 'complete' | 'error';
@@ -26,6 +29,17 @@ const STATUS_CONFIG = {
 };
 
 export function DVMJobStatus({ status, currentTask, resultEventId, errorMessage, onReset }: DVMJobStatusProps) {
+  const [pendingStale, setPendingStale] = useState(false);
+
+  useEffect(() => {
+    if (status !== 'pending') {
+      setPendingStale(false);
+      return;
+    }
+    const t = setTimeout(() => setPendingStale(true), PENDING_STALE_MS);
+    return () => clearTimeout(t);
+  }, [status]);
+
   if (status === 'idle') return null;
 
   const config = STATUS_CONFIG[status];
@@ -96,6 +110,20 @@ export function DVMJobStatus({ status, currentTask, resultEventId, errorMessage,
               <strong>Action Required:</strong> Sign the final video event to publish your remix.
               Signing request sent automatically...
             </p>
+          </div>
+        )}
+
+        {status === 'pending' && pendingStale && (
+          <div className="bg-amber-500/10 border border-amber-500/20 p-3 rounded-lg space-y-2">
+            <p className="text-sm">
+              <strong>No response from DVM yet.</strong> The job was sent to the relay. If the DVM service is not running or not connected to the same relay (e.g. <code className="text-xs bg-muted px-1 rounded">wss://relay.brainrot.rehab</code>), you will not see updates.
+            </p>
+            <p className="text-xs text-muted-foreground">
+              For production: run the DVM backend and set <code className="bg-muted px-1 rounded">VITE_DVM_PUBKEY</code> when building the client.
+            </p>
+            <Button variant="outline" size="sm" onClick={onReset}>
+              Cancel
+            </Button>
           </div>
         )}
       </CardContent>

@@ -22,6 +22,17 @@ docker compose up --build
 
 Both services auto-reload on file changes via volume mounts.
 
+### Production deployment
+
+For video building to work in production you need **both**:
+
+1. **DVM backend** – Run the DVM service (e.g. in Docker or your host) and point it at your relay with `RELAYS=wss://relay.brainrot.rehab` (or your relay). The DVM must be able to reach the relay and have `DVM_SECRET_KEY` set.
+2. **Client build** – When building the client, set the DVM’s **public key** so the app can subscribe to job status:  
+   `VITE_DVM_PUBKEY=<hex-pubkey> npm run build` (or in your CI env).  
+   The DVM logs its public key on startup: `🔑 DVM Public Key: <hex>`.
+
+If the DVM is not running or the client was built without `VITE_DVM_PUBKEY`, jobs will stay at “Waiting for DVM…” and never complete.
+
 ---
 
 ## Architecture

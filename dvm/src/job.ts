@@ -11,7 +11,9 @@ import {
 } from './nostr.js'
 import { composeVideo, withTempDir } from './ffmpeg.js'
 import { JOB_REQUEST_KIND, TASK_RESPONSE_KIND } from './types.js'
+import { createLogger } from './log.js'
 
+const log = createLogger('job')
 const VIDEO_KIND = 34236
 
 function waitForTaskResponse(
@@ -47,51 +49,63 @@ export async function runJob(
   secretKey: Uint8Array,
   requestEvent: NostrEvent
 ): Promise<void> {
-  const requestId = requestEvent.id
-  const customerPubkey = requestEvent.pubkey
+  const jobId = requestEvent.id
+  const pubkey = requestEvent.pubkey
   let payload: ReturnType<typeof parseJobRequest>
   try {
     payload = parseJobRequest(requestEvent.content)
-  } catch {
+  } catch (e) {
+    log.error('Invalid job request JSON', { jobId, pubkey, error: String(e) })
     const err = signEvent(
-      buildJobFeedback(requestId, customerPubkey, 'error', 'Invalid job request JSON'),
+      buildJobFeedback(jobId, requestEvent.pubkey, 'error', 'Invalid job request JSON'),
       secretKey
     )
     await pool.publish(relays, err)
     return
   }
 
+  log.info('Job started', {
+    jobId,
+    pubkey,
+    segments: payload.clips.length,
+    blossom_upload_url: payload.blossom_upload_url,
+    caption: payload.caption?.slice(0, 80),
+  })
+
   await pool.publish(
     relays,
-    signEvent(buildJobFeedback(requestId, customerPubkey, 'processing', ''), secretKey)
+    signEvent(buildJobFeedback(jobId, requestEvent.pubkey, 'processing', ''), secretKey)
   )
-  console.log(`⚙️  Job ${requestId}: Starting download + ffmpeg for ${payload.clips.length} segment(s)`)
 
+  // --- Step 1: Download + ffmpeg ---
   let videoBuffer: Buffer
   try {
-    console.log(`📥 Downloading and processing ${payload.clips.length} video segment(s)...`)
+    log.info('Downloading and composing video', { jobId, segments: payload.clips.length })
+    const t0 = Date.now()
     videoBuffer = await withTempDir(async (dir) => {
       const path = await composeVideo(payload.clips, dir)
       return readFile(path)
     })
-    console.log(`✅ Video processed successfully (${(videoBuffer.length / 1024 / 1024).toFixed(2)} MB)`)
+    const elapsedMs = Date.now() - t0
+    log.info('Video composed', { jobId, sizeMB: (videoBuffer.length / 1024 / 1024).toFixed(2), elapsedMs })
   } catch (e) {
-    console.error(`❌ Job ${requestId} failed during video processing:`, e)
+    log.error('Video processing failed', { jobId, error: String(e) })
     const err = signEvent(
-      buildJobFeedback(requestId, customerPubkey, 'error', String(e)),
+      buildJobFeedback(jobId, requestEvent.pubkey, 'error', String(e)),
       secretKey
     )
     await pool.publish(relays, err)
     return
   }
 
+  // --- Step 2: Request Blossom auth from user ---
   const payloadHash = createHash('sha256').update(videoBuffer).digest('hex')
   const blossomBaseUrl = payload.blossom_upload_url.replace(/\/$/, '')
   const blossomUploadUrl = blossomBaseUrl.endsWith('/upload') ? blossomBaseUrl : `${blossomBaseUrl}/upload`
 
   const now = Math.floor(Date.now() / 1000)
   const expiration = now + 60
-  const taskEvent = buildTaskEvent(requestId, customerPubkey, {
+  const taskEvent = buildTaskEvent(jobId, requestEvent.pubkey, {
     type: 'sign_blossom',
     url: blossomUploadUrl,
     payload_hash: payloadHash,
@@ -99,62 +113,83 @@ export async function runJob(
     expiration,
   })
   await pool.publish(relays, signEvent(taskEvent, secretKey))
-  console.log(`⏳ Waiting for user to sign Blossom auth event (120s timeout)`)
-  console.log(`   Upload URL: ${blossomUploadUrl}`)
-  console.log(`   Payload hash: ${payloadHash}`)
+  log.info('Waiting for Blossom auth signature', { jobId, uploadUrl: blossomUploadUrl, payloadHash, sizeMB: (videoBuffer.length / 1024 / 1024).toFixed(2) })
 
   let nip98Response: NostrEvent
   try {
-    nip98Response = await waitForTaskResponse(pool, relays, requestId, customerPubkey, 120_000)
+    nip98Response = await waitForTaskResponse(pool, relays, jobId, requestEvent.pubkey, 120_000)
+    log.info('Received Blossom auth response', { jobId })
   } catch (e) {
-    console.error(`Job ${requestId}: NIP-98 sign timeout`)
+    log.error('Blossom auth timeout — user did not sign in time', { jobId })
     await pool.publish(
       relays,
       signEvent(
-        buildTaskEvent(requestId, customerPubkey, { type: 'error', message: 'NIP-98 sign timeout' }),
+        buildTaskEvent(jobId, requestEvent.pubkey, { type: 'error', message: 'NIP-98 sign timeout' }),
         secretKey
       )
     )
     return
   }
 
-  // Client sends signed Blossom auth event (kind 24242) as JSON in task response content
   let blossomAuthEvent: NostrEvent
   try {
     blossomAuthEvent = JSON.parse(nip98Response.content) as NostrEvent
   } catch {
+    log.error('Invalid Blossom auth response (bad JSON)', { jobId })
     await pool.publish(
       relays,
       signEvent(
-        buildTaskEvent(requestId, customerPubkey, { type: 'error', message: 'Invalid Blossom auth response' }),
+        buildTaskEvent(jobId, requestEvent.pubkey, { type: 'error', message: 'Invalid Blossom auth response' }),
         secretKey
       )
     )
     return
   }
-  console.log(`📤 Uploading to Blossom: ${blossomUploadUrl}`)
-  console.log(`   Blossom auth event:`, JSON.stringify(blossomAuthEvent, null, 2))
-  console.log(`   Video size: ${(videoBuffer.length / 1024 / 1024).toFixed(2)} MB`)
+
+  // --- Step 3: Upload to Blossom ---
+  log.info('Uploading to Blossom', { jobId, uploadUrl: blossomUploadUrl, sizeMB: (videoBuffer.length / 1024 / 1024).toFixed(2) })
 
   const blossomToken = Buffer.from(JSON.stringify(blossomAuthEvent)).toString('base64')
   
-  const uploadRes = await fetch(blossomUploadUrl, {
-    method: 'PUT',
-    headers: {
-      Authorization: `Nostr ${blossomToken}`,
-      'Content-Type': 'video/mp4',
-      'X-SHA-256': payloadHash, // Required by BUD-11 for upload authorization
-    },
-    body: new Uint8Array(videoBuffer),
-  })
-  if (!uploadRes.ok) {
-    const errorBody = await uploadRes.text().catch(() => '')
-    console.error(`❌ Blossom upload failed: ${uploadRes.status} ${uploadRes.statusText}`)
-    console.error(`   Response: ${errorBody}`)
+  let uploadRes: Response
+  try {
+    uploadRes = await fetch(blossomUploadUrl, {
+      method: 'PUT',
+      headers: {
+        Authorization: `Nostr ${blossomToken}`,
+        'Content-Type': 'video/mp4',
+        'X-SHA-256': payloadHash,
+      },
+      body: new Uint8Array(videoBuffer),
+    })
+  } catch (e) {
+    log.error('Blossom upload network error', { jobId, error: String(e), uploadUrl: blossomUploadUrl })
     await pool.publish(
       relays,
       signEvent(
-        buildTaskEvent(requestId, customerPubkey, {
+        buildTaskEvent(jobId, requestEvent.pubkey, {
+          type: 'error',
+          message: `Blossom upload network error: ${String(e)}`,
+        }),
+        secretKey
+      )
+    )
+    return
+  }
+
+  if (!uploadRes.ok) {
+    const errorBody = await uploadRes.text().catch(() => '')
+    log.error('Blossom upload failed', {
+      jobId,
+      status: uploadRes.status,
+      statusText: uploadRes.statusText,
+      responseBody: errorBody.slice(0, 500),
+      uploadUrl: blossomUploadUrl,
+    })
+    await pool.publish(
+      relays,
+      signEvent(
+        buildTaskEvent(jobId, requestEvent.pubkey, {
           type: 'error',
           message: `Blossom upload failed: ${uploadRes.status}`,
         }),
@@ -163,7 +198,7 @@ export async function runJob(
     )
     return
   }
-  console.log(`✅ Blossom upload successful`)
+
   let videoUrl: string
   const contentType = uploadRes.headers.get('content-type') || ''
   if (contentType.includes('application/json')) {
@@ -173,16 +208,12 @@ export async function runJob(
     videoUrl = uploadRes.headers.get('location') || (await uploadRes.text()) || blossomUploadUrl
   }
   
-  // Fix: Blossom server returns http:// even when accessed via https://
-  // Rewrite to match the protocol of the upload URL
   if (videoUrl.startsWith('http://') && blossomUploadUrl.startsWith('https://')) {
     videoUrl = videoUrl.replace('http://', 'https://')
-    console.log(`   Video URL (rewritten to HTTPS): ${videoUrl}`)
-  } else {
-    console.log(`   Video URL: ${videoUrl}`)
   }
+  log.info('Blossom upload successful', { jobId, videoUrl })
 
-  // Kind 34236 is parameterized replaceable - need unique d tag or each new video overwrites the previous
+  // --- Step 4: Request video event signature from user ---
   const sourceTags: string[][] = []
   const seenEventIds = new Set<string>()
   const seenPubkeys = new Set<string>()
@@ -201,7 +232,7 @@ export async function runJob(
     kind: VIDEO_KIND,
     created_at: Math.floor(Date.now() / 1000),
     tags: [
-      ['d', requestId],
+      ['d', jobId],
       ['url', videoUrl],
       ['client', 'brainrot.rehab'],
       ...sourceTags,
@@ -211,21 +242,22 @@ export async function runJob(
   await pool.publish(
     relays,
     signEvent(
-      buildTaskEvent(requestId, customerPubkey, { type: 'sign_event', event: unsigned34236 }),
+      buildTaskEvent(jobId, requestEvent.pubkey, { type: 'sign_event', event: unsigned34236 }),
       secretKey
     )
   )
-  console.log(`Job ${requestId}: waiting for event signature (120s)`)
+  log.info('Waiting for video event signature', { jobId })
 
   let signEventResponse: NostrEvent
   try {
-    signEventResponse = await waitForTaskResponse(pool, relays, requestId, customerPubkey, 120_000)
+    signEventResponse = await waitForTaskResponse(pool, relays, jobId, requestEvent.pubkey, 120_000)
+    log.info('Received video event signature', { jobId })
   } catch (e) {
-    console.error(`Job ${requestId}: event sign timeout`)
+    log.error('Video event sign timeout', { jobId })
     await pool.publish(
       relays,
       signEvent(
-        buildTaskEvent(requestId, customerPubkey, { type: 'error', message: 'Sign event timeout' }),
+        buildTaskEvent(jobId, requestEvent.pubkey, { type: 'error', message: 'Sign event timeout' }),
         secretKey
       )
     )
@@ -237,48 +269,42 @@ export async function runJob(
   try {
     signedEv = JSON.parse(signedContent) as NostrEvent
   } catch (err) {
-    console.error(`Job ${requestId}: failed to parse signed event:`, err)
-    console.error(`   Content:`, signedContent)
+    log.error('Failed to parse signed video event', { jobId, error: String(err), contentPreview: signedContent.slice(0, 200) })
     await pool.publish(
       relays,
       signEvent(
-        buildTaskEvent(requestId, customerPubkey, { type: 'error', message: 'Invalid signed event' }),
+        buildTaskEvent(jobId, requestEvent.pubkey, { type: 'error', message: 'Invalid signed event' }),
         secretKey
       )
     )
     return
   }
 
+  // --- Step 5: Publish video event + success ---
   const publishResults = await Promise.allSettled(pool.publish(relays, signedEv))
   const rejected = publishResults.filter(r => r.status === 'rejected')
   if (rejected.length > 0) {
-    console.error(`⚠️ Some relays rejected video event:`, rejected.map(r => (r as PromiseRejectedResult).reason))
+    log.warn('Some relays rejected video event', { jobId, rejected: rejected.map(r => String((r as PromiseRejectedResult).reason)) })
   }
 
-  console.log(`Job ${requestId}: publishing success task`)
   const successEvent = signEvent(
-    buildTaskEvent(requestId, customerPubkey, { type: 'success', result_event_id: signedEv.id }),
+    buildTaskEvent(jobId, requestEvent.pubkey, { type: 'success', result_event_id: signedEv.id }),
     secretKey
   )
   await pool.publish(relays, successEvent)
 
-  // Build tags for all original events and authors
   const extraTags: string[][] = []
   for (const clip of payload.clips) {
-    if (clip.event_id) {
-      extraTags.push(['e', clip.event_id, '', 'mention'])
-    }
-    if (clip.author_pubkey) {
-      extraTags.push(['p', clip.author_pubkey])
-    }
+    if (clip.event_id) extraTags.push(['e', clip.event_id, '', 'mention'])
+    if (clip.author_pubkey) extraTags.push(['p', clip.author_pubkey])
   }
   
   await pool.publish(
     relays,
     signEvent(
-      buildJobResult(requestId, customerPubkey, JSON.stringify({ event_id: signedEv.id, url: videoUrl }), extraTags),
+      buildJobResult(jobId, requestEvent.pubkey, JSON.stringify({ event_id: signedEv.id, url: videoUrl }), extraTags),
       secretKey
     )
   )
-  console.log(`Job ${requestId}: complete`, signedEv.id)
+  log.info('Job complete', { jobId, resultEventId: signedEv.id, videoUrl })
 }
