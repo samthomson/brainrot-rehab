@@ -2,8 +2,9 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { ChunkySlider } from '@/components/ChunkySlider';
-import { Play, Pause, Trash2, Copy, GripVertical } from 'lucide-react';
+import { Play, Pause, Trash2, Copy, GripVertical, HelpCircle, Check } from 'lucide-react';
 import type { SourceVideo, TimelineSegment } from '@/types/video';
 
 interface SourceVideoItemProps {
@@ -39,6 +40,8 @@ export function SourceVideoItem({
   const [currentTime, setCurrentTime] = useState(0);
   const [videoDuration, setVideoDuration] = useState(0);
   const [metadataLoaded, setMetadataLoaded] = useState(hasInitialRange);
+  const [eventJsonOpen, setEventJsonOpen] = useState(false);
+  const [jsonCopied, setJsonCopied] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const updateTimeoutRef = useRef<NodeJS.Timeout>();
 
@@ -159,13 +162,28 @@ export function SourceVideoItem({
   return (
     <Card className="group">
       <CardContent className="p-4 flex flex-col gap-4">
-        {/* Top row: drag handle + index + video name */}
-        <div className="cursor-move flex items-center gap-2">
-          <GripVertical className="h-5 w-5 text-muted-foreground shrink-0" />
-          <div className="flex items-center justify-center h-8 w-8 rounded-full bg-primary/10 text-primary font-bold text-sm shrink-0">
-            {index + 1}
+        {/* Top row: drag handle + index + video name + ? */}
+        <div className="flex items-center gap-2">
+          <div className="cursor-move flex items-center gap-2 min-w-0 flex-1">
+            <GripVertical className="h-5 w-5 text-muted-foreground shrink-0" />
+            <div className="flex items-center justify-center h-8 w-8 rounded-full bg-primary/10 text-primary font-bold text-sm shrink-0">
+              {index + 1}
+            </div>
+            <span className="text-sm font-medium truncate">{video.name}</span>
           </div>
-          <span className="text-sm font-medium truncate">{video.name}</span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 shrink-0 rounded-full text-muted-foreground hover:text-foreground"
+            onClick={(e) => {
+              e.stopPropagation();
+              setEventJsonOpen(true);
+            }}
+            title="View source event JSON"
+          >
+            <HelpCircle className="h-4 w-4" />
+          </Button>
         </div>
 
         {/* Video + controls in one column; buttons in a column to the right */}
@@ -274,6 +292,31 @@ export function SourceVideoItem({
           </div>
         </div>
       </CardContent>
+      <Dialog open={eventJsonOpen} onOpenChange={setEventJsonOpen}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
+          <DialogTitle className="sr-only">Source event JSON</DialogTitle>
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-sm font-medium">Original event (JSON)</span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={async () => {
+                await navigator.clipboard.writeText(JSON.stringify(video.event, null, 2));
+                setJsonCopied(true);
+                setTimeout(() => setJsonCopied(false), 2000);
+              }}
+            >
+              {jsonCopied ? <Check className="h-4 w-4 mr-1" /> : <Copy className="h-4 w-4 mr-1" />}
+              {jsonCopied ? 'Copied!' : 'Copy'}
+            </Button>
+          </div>
+          <div className="flex-1 min-h-0 overflow-y-auto">
+            <pre className="text-xs bg-muted p-4 rounded-lg overflow-x-auto">
+              <code>{JSON.stringify(video.event, null, 2)}</code>
+            </pre>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }

@@ -1,16 +1,17 @@
 import { useState, useRef, useEffect, memo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Play, Pause, SkipBack, SkipForward, Eye } from 'lucide-react';
+import { Play, Pause, SkipBack, SkipForward, Eye, HelpCircle } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import type { TimelineSegment, SourceVideo } from '@/types/video';
 
 interface RemixPreviewProps {
   segments: TimelineSegment[];
   sourceVideos: SourceVideo[];
+  onPayloadJsonClick?: () => void;
 }
 
-export function RemixPreview({ segments, sourceVideos }: RemixPreviewProps) {
+export function RemixPreview({ segments, sourceVideos, onPayloadJsonClick }: RemixPreviewProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentSegmentIndex, setCurrentSegmentIndex] = useState(0);
   const [segmentProgress, setSegmentProgress] = useState(0);
@@ -140,11 +141,16 @@ export function RemixPreview({ segments, sourceVideos }: RemixPreviewProps) {
   if (segments.length === 0) {
     return (
       <Card className="h-full">
-        <CardHeader>
+        <CardHeader className="flex flex-row items-start justify-between gap-2">
           <CardTitle className="flex items-center gap-2">
             <Eye className="h-5 w-5" />
             Preview
           </CardTitle>
+          {onPayloadJsonClick && (
+            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 rounded-full text-muted-foreground hover:text-foreground" onClick={onPayloadJsonClick} title="View payload JSON">
+              <HelpCircle className="h-4 w-4" />
+            </Button>
+          )}
         </CardHeader>
         <CardContent>
           <div className="aspect-video bg-muted rounded-lg flex items-center justify-center text-muted-foreground">
@@ -160,14 +166,21 @@ export function RemixPreview({ segments, sourceVideos }: RemixPreviewProps) {
 
   return (
     <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-base">
-          <Eye className="h-5 w-5" />
-          Preview
-        </CardTitle>
-        <p className="text-sm text-muted-foreground">
-          Segment {safeSegmentIndex + 1} of {segments.length}
-        </p>
+      <CardHeader className="pb-3 flex flex-row items-start justify-between gap-2">
+        <div>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Eye className="h-5 w-5" />
+            Preview
+          </CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Segment {safeSegmentIndex + 1} of {segments.length}
+          </p>
+        </div>
+        {onPayloadJsonClick && (
+          <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 rounded-full text-muted-foreground hover:text-foreground" onClick={onPayloadJsonClick} title="View payload JSON">
+            <HelpCircle className="h-4 w-4" />
+          </Button>
+        )}
       </CardHeader>
       <CardContent className="space-y-3">
         {/* Video Player */}
