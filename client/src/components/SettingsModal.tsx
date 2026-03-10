@@ -104,7 +104,7 @@ export function SettingsModal({
                 onChange={(e) => onDvmPubkeyChange(e.target.value)}
                 className="font-mono text-sm"
               />
-              <p className="text-xs text-muted-foreground">The pubkey of the DVM that processes your videos</p>
+              <p className="text-xs text-muted-foreground">The pubkey of the DVM that processes your videos (default from build; you can override)</p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="blossom-url">Blossom Upload URL</Label>

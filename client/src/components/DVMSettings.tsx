@@ -64,7 +64,7 @@ export function DVMSettings({
               className="font-mono text-sm"
             />
             <p className="text-xs text-muted-foreground">
-              The pubkey of the DVM service that will process your videos
+              The pubkey of the DVM service that will process your videos (default from build; you can override)
             </p>
           </div>
 

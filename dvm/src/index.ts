@@ -28,6 +28,7 @@ if (!DVM_SECRET_KEY_HEX) {
 const secretKey = utils.hexToBytes(DVM_SECRET_KEY_HEX)
 const publicKey = getPublicKey(secretKey)
 console.log('🔑 DVM Public Key:', publicKey)
+console.log('   → Set VITE_DVM_PUBKEY=' + publicKey + ' when building the client, or paste in Settings → DVM Pubkey')
 
 const pool = new SimplePool()
 
