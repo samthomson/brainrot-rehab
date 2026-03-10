@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { Play, Plus, Copy, Ban } from 'lucide-react';
+import { Play, Pause, Plus, Copy, Ban } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { formatDistanceToNow } from 'date-fns';
 import { useVideoAuthor } from '@/hooks/useVideoAuthor';
@@ -18,7 +18,10 @@ interface VideoCardProps {
 export function VideoCard({ video, onQuickAdd, showQuickAdd = false, onBlockUser, onClick }: VideoCardProps) {
   const { displayName } = useVideoAuthor(video);
   const [generatedThumbnail, setGeneratedThumbnail] = useState<string | null>(null);
+  const [showInlinePlayer, setShowInlinePlayer] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
   const thumbnailVideoRef = useRef<HTMLVideoElement>(null);
+  const inlineVideoRef = useRef<HTMLVideoElement>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -79,6 +82,33 @@ export function VideoCard({ video, onQuickAdd, showQuickAdd = false, onBlockUser
     }
   };
 
+  const handleCardClick = () => {
+    if (onClick) {
+      onClick();
+    } else {
+      setShowInlinePlayer(true);
+      setIsPlaying(true);
+      setTimeout(() => {
+        if (inlineVideoRef.current) {
+          inlineVideoRef.current.play();
+        }
+      }, 100);
+    }
+  };
+
+  const togglePlayPause = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (inlineVideoRef.current) {
+      if (isPlaying) {
+        inlineVideoRef.current.pause();
+        setIsPlaying(false);
+      } else {
+        inlineVideoRef.current.play();
+        setIsPlaying(true);
+      }
+    }
+  };
+
   const formatDate = (timestamp: number) => {
     try {
       return formatDistanceToNow(new Date(timestamp * 1000), { addSuffix: true });
@@ -92,37 +122,67 @@ export function VideoCard({ video, onQuickAdd, showQuickAdd = false, onBlockUser
   return (
     <Card
       className="cursor-pointer transition-all hover:scale-[1.03] hover:shadow-lg group"
-      onClick={onClick}
+      onClick={handleCardClick}
     >
       <CardContent className="p-0">
         <div className="relative aspect-[9/16] bg-muted overflow-hidden rounded-t">
-          {thumbnailSrc ? (
-            <img
-              src={thumbnailSrc}
-              alt={video.name}
-              className="w-full h-full object-cover"
-              loading="lazy"
-            />
+          {showInlinePlayer ? (
+            <>
+              <video
+                ref={inlineVideoRef}
+                src={video.url}
+                className="w-full h-full object-cover"
+                playsInline
+                crossOrigin="anonymous"
+                loop
+                onEnded={() => setIsPlaying(false)}
+              />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <Button
+                  onClick={togglePlayPause}
+                  size="lg"
+                  className="rounded-full h-12 w-12"
+                  variant="secondary"
+                >
+                  {isPlaying ? (
+                    <Pause className="h-6 w-6" />
+                  ) : (
+                    <Play className="h-6 w-6" />
+                  )}
+                </Button>
+              </div>
+            </>
           ) : (
-            <div className="w-full h-full flex items-center justify-center">
-              <Play className="h-12 w-12 text-muted-foreground" />
-            </div>
-          )}
-          
-          {!video.thumbnailUrl && !generatedThumbnail && (
-            <video
-              ref={thumbnailVideoRef}
-              src={video.url}
-              className="hidden"
-              preload="metadata"
-              crossOrigin="anonymous"
-              muted
-            />
-          )}
+            <>
+              {thumbnailSrc ? (
+                <img
+                  src={thumbnailSrc}
+                  alt={video.name}
+                  className="w-full h-full object-cover"
+                  loading="lazy"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center">
+                  <Play className="h-12 w-12 text-muted-foreground" />
+                </div>
+              )}
+              
+              {!video.thumbnailUrl && !generatedThumbnail && (
+                <video
+                  ref={thumbnailVideoRef}
+                  src={video.url}
+                  className="hidden"
+                  preload="metadata"
+                  crossOrigin="anonymous"
+                  muted
+                />
+              )}
 
-          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
-            <Play className="h-12 w-12 text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow-lg" />
-          </div>
+              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
+                <Play className="h-12 w-12 text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow-lg" />
+              </div>
+            </>
+          )}
           
           {/* Action Buttons */}
           <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">

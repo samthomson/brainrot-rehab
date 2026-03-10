@@ -9,7 +9,6 @@ import { DEFAULT_BLOSSOM_UPLOAD_URL, DEFAULT_DVM_PUBKEY } from '@/lib/dvmRelays'
 
 const navItems = [
   { path: '/rot', label: 'Rot' },
-  { path: '/rotten', label: 'Rotten' },
   { path: '/rehab', label: 'Rehab' },
 ] as const;
 

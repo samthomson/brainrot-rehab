@@ -88,6 +88,76 @@ export function useBrainrotVideos() {
   });
 }
 
+/** Parse any event that has a url tag (kind 34236 or similar) into Video. */
+function parseVideoEvent(event: NostrEvent): Video | null {
+  try {
+    let urlTag = event.tags.find(([name]) => name === 'url')?.[1];
+    
+    if (!urlTag) {
+      const imetaTag = event.tags.find(([name]) => name === 'imeta');
+      if (imetaTag) {
+        const parts = imetaTag[1]?.split(/\s+/) || [];
+        for (let i = 0; i < parts.length - 1; i++) {
+          if (parts[i].toLowerCase() === 'url') {
+            urlTag = parts[i + 1];
+            break;
+          }
+        }
+      }
+    }
+    
+    if (!urlTag) return null;
+    const caption = typeof event.content === 'string' ? event.content.trim() : '';
+    const name = caption || `Video by ${event.pubkey.slice(0, 8)}...`;
+    return {
+      id: event.id,
+      event,
+      name,
+      url: urlTag,
+      duration: 0,
+      thumbnailUrl: undefined,
+      pubkey: event.pubkey,
+      publishedAt: event.created_at,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** Fetch video events by event id (for source refs in lightbox). Queries by ids only so we get 34236 or other video kinds. */
+export function useVideoEventsById(ids: string[]) {
+  const { nostr } = useNostr();
+  const key = ids.slice().sort().join(',');
+
+  return useQuery({
+    queryKey: ['video-events-by-id', key],
+    queryFn: async () => {
+      if (ids.length === 0) return [];
+      console.log('[source-videos] Querying for event ids:', ids);
+      const events = await nostr.query(
+        [{ ids, limit: ids.length }],
+        { signal: AbortSignal.timeout(QUERY_TIMEOUT_MS) }
+      );
+      console.log('[source-videos] Found events:', events.length, events.map(e => e.id));
+      console.log('[source-videos] Event kinds:', events.map(e => e.kind));
+      console.log('[source-videos] Event tags sample:', events[0]?.tags);
+      const videos: Video[] = [];
+      for (const event of events) {
+        const video = parseVideoEvent(event);
+        if (video) {
+          videos.push(video);
+        } else {
+          console.log('[source-videos] Failed to parse event:', event.id, 'kind:', event.kind, 'tags:', event.tags);
+        }
+      }
+      console.log('[source-videos] Parsed videos:', videos.length);
+      return videos;
+    },
+    enabled: ids.length > 0,
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
 /** Current user's brainrot.rehab videos. */
 export function useMyBrainrotVideos(pubkey: string | undefined) {
   const { nostr } = useNostr();

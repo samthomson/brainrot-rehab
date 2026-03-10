@@ -13,6 +13,8 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar.tsx'
 import { useLoggedInAccounts, type Account } from '@/hooks/useLoggedInAccounts';
 import { genUserName } from '@/lib/genUserName';
 import { cn } from '@/lib/utils';
+import { nip19 } from 'nostr-tools';
+import { useNavigate } from 'react-router-dom';
 
 interface AccountSwitcherProps {
   onAddAccountClick: () => void;
@@ -23,11 +25,55 @@ interface AccountSwitcherProps {
 
 export function AccountSwitcher({ onAddAccountClick, simplified, onSettingsClick }: AccountSwitcherProps) {
   const { currentUser, otherUsers, setLogin, removeLogin } = useLoggedInAccounts();
+  const navigate = useNavigate();
 
   if (!currentUser) return null;
 
   const getDisplayName = (account: Account): string => {
     return account.metadata.name ?? genUserName(account.pubkey);
+  }
+
+  if (simplified) {
+    return (
+      <div className="flex items-stretch">
+        <button
+          onClick={() => navigate(`/profile/${nip19.npubEncode(currentUser.pubkey)}`)}
+          className="flex items-center gap-2 hover:bg-accent transition-all text-foreground px-3 py-2 rounded-l-lg border border-r-0"
+        >
+          <Avatar className="w-7 h-7 rounded-lg">
+            <AvatarImage src={currentUser.metadata.picture} alt={getDisplayName(currentUser)} />
+            <AvatarFallback className="rounded-lg">{getDisplayName(currentUser).charAt(0)}</AvatarFallback>
+          </Avatar>
+          <span className="font-medium text-sm">{getDisplayName(currentUser)}</span>
+        </button>
+        <DropdownMenu modal={false}>
+          <DropdownMenuTrigger asChild>
+            <button className="flex items-center justify-center hover:bg-accent transition-all text-foreground px-2 rounded-r-lg border">
+              <ChevronDown className="w-4 h-4 text-muted-foreground" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent className='w-56 p-2 animate-scale-in' align="end">
+            {onSettingsClick && (
+              <DropdownMenuItem
+                onClick={onSettingsClick}
+                className='flex items-center gap-2 cursor-pointer p-2 rounded-md'
+              >
+                <Settings className='w-4 h-4' />
+                <span>Settings</span>
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={() => removeLogin(currentUser.id)}
+              className='flex items-center gap-2 cursor-pointer p-2 rounded-md text-red-500'
+            >
+              <LogOut className='w-4 h-4' />
+              <span>Log out</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    );
   }
 
   return (
@@ -52,6 +98,13 @@ export function AccountSwitcher({ onAddAccountClick, simplified, onSettingsClick
       <DropdownMenuContent className='w-56 p-2 animate-scale-in'>
         {simplified ? (
           <>
+            <DropdownMenuItem
+              onClick={() => navigate(`/profile/${nip19.npubEncode(currentUser.pubkey)}`)}
+              className='flex items-center gap-2 cursor-pointer p-2 rounded-md'
+            >
+              <UserIcon className='w-4 h-4' />
+              <span>Profile</span>
+            </DropdownMenuItem>
             {onSettingsClick && (
               <DropdownMenuItem
                 onClick={onSettingsClick}
