@@ -183,6 +183,20 @@ export async function runJob(
   }
 
   // Kind 34236 is parameterized replaceable - need unique d tag or each new video overwrites the previous
+  const sourceTags: string[][] = []
+  const seenEventIds = new Set<string>()
+  const seenPubkeys = new Set<string>()
+  for (const clip of payload.clips) {
+    if (clip.event_id && !seenEventIds.has(clip.event_id)) {
+      seenEventIds.add(clip.event_id)
+      sourceTags.push(['e', clip.event_id, '', 'mention'])
+    }
+    if (clip.author_pubkey && !seenPubkeys.has(clip.author_pubkey)) {
+      seenPubkeys.add(clip.author_pubkey)
+      sourceTags.push(['p', clip.author_pubkey])
+    }
+  }
+
   const unsigned34236 = {
     kind: VIDEO_KIND,
     created_at: Math.floor(Date.now() / 1000),
@@ -190,6 +204,7 @@ export async function runJob(
       ['d', requestId],
       ['url', videoUrl],
       ['client', 'brainrot.rehab'],
+      ...sourceTags,
     ],
     content: payload.caption ?? '',
   }
