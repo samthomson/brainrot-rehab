@@ -68,11 +68,11 @@ export function useDVMJob(dvmPubkey: string, relays: string[]) {
     const jobId = currentJobId;
     // Subscribe to events from 2 seconds ago to ensure we don't miss any due to clock skew
     const subscriptionTime = Math.floor(Date.now() / 1000) - 2;
-    const filter = { 
-      kinds: [30534], 
-      '#e': [jobId], 
+    const filter = {
+      kinds: [30534],
+      '#e': [jobId],
       authors: [dvmPubkey],
-      since: subscriptionTime 
+      since: subscriptionTime,
     };
     const controller = new AbortController();
     const signal = controller.signal;
@@ -84,7 +84,6 @@ export function useDVMJob(dvmPubkey: string, relays: string[]) {
 
       try {
         const task: DVMTask = JSON.parse(taskEvent.content);
-        console.log(`[DVM] Handling task: ${task.type}`);
         
         // Terminal states - end immediately
         if (task.type === 'success') {
@@ -166,11 +165,8 @@ export function useDVMJob(dvmPubkey: string, relays: string[]) {
           };
           const signedVideoEvent = await user.signer.signEvent(template);
 
-          // Publish the actual video event (kind 34236)
-          console.log('[Client] Publishing video event (kind 34236):', signedVideoEvent.id);
           await publishToPool(nostr, relays, signedVideoEvent);
 
-          // Also send response to DVM so it knows we're done
           const responseEvent = await user.signer.signEvent({
             kind: 30535,
             content: JSON.stringify(signedVideoEvent),
@@ -196,8 +192,7 @@ export function useDVMJob(dvmPubkey: string, relays: string[]) {
       if (signal.aborted) return;
       if (taskEvent.pubkey === user?.pubkey) return;
       if (processedEventIds.current.has(taskEvent.id)) return;
-      
-      // Queue the event and process
+
       eventQueue.current.push(taskEvent);
       
       // If not currently processing, start processing the queue
@@ -294,7 +289,6 @@ export function useDVMJob(dvmPubkey: string, relays: string[]) {
         // Small delay to ensure subscription is established
         await new Promise(resolve => setTimeout(resolve, 100));
 
-        console.log('[DVM] Publishing job 5342 to relays:', relays);
         await publishToPool(nostr, relays, signedEvent);
 
         toast({
