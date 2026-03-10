@@ -3,6 +3,7 @@
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createHead, UnheadProvider } from '@unhead/react/client';
+import { Head } from '@unhead/react';
 import { InferSeoMetaPlugin } from '@unhead/addons';
 import { Suspense } from 'react';
 import NostrProvider from '@/components/NostrProvider';
@@ -20,6 +21,15 @@ const head = createHead({
     InferSeoMetaPlugin(),
   ],
 });
+
+function Favicon() {
+  return (
+    <Head>
+      <link rel="icon" href="/favicon.png" type="image/png" />
+      <link rel="apple-touch-icon" href="/favicon.png" />
+    </Head>
+  );
+}
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -47,6 +57,7 @@ const defaultConfig: AppConfig = {
 export function App() {
   return (
     <UnheadProvider head={head}>
+      <Favicon />
       <AppProvider storageKey="nostr:app-config" defaultConfig={defaultConfig}>
         <QueryClientProvider client={queryClient}>
           <NostrLoginProvider storageKey='nostr:login'>

@@ -14,7 +14,7 @@ import { useZaps } from '@/hooks/useZaps';
 import { useWallet } from '@/hooks/useWallet';
 import { ZapDialog } from '@/components/ZapDialog';
 import { useIsFollowing, useToggleFollow } from '@/hooks/useFollow';
-import { UserPlus, UserMinus } from 'lucide-react';
+import { UserPlus, UserMinus, Copy } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { Heart, Repeat2, MessageSquare, Send, Zap, Play, Pause } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
@@ -365,6 +365,23 @@ export function VideoLightbox({ video, open, onOpenChange }: VideoLightboxProps)
                     )}
                   </p>
                 )}
+                <div className="flex items-center gap-2 mt-2">
+                  <code className="text-xs text-muted-foreground font-mono truncate max-w-[12rem]" title={video.id}>
+                    {video.id.slice(0, 16)}…
+                  </code>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-muted-foreground hover:text-foreground"
+                    title="Copy event ID"
+                    onClick={async () => {
+                      await navigator.clipboard.writeText(video.id);
+                      toast({ title: 'Copied', description: 'Event ID copied to clipboard' });
+                    }}
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
               </div>
 
               {/* Reactions & Actions */}

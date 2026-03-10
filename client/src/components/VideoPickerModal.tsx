@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -9,9 +9,25 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Search, Loader2, Settings } from 'lucide-react';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command';
+import { Search, Loader2, Settings, Check, ChevronsUpDown } from 'lucide-react';
 import { useShortFormVideos } from '@/hooks/useShortFormVideos';
+import { useContactList } from '@/hooks/useFollow';
+import { useBulkAuthorMetadata } from '@/hooks/useAuthor';
 import { VideoCard } from '@/components/VideoCard';
+import { nip19 } from 'nostr-tools';
 import type { Video } from '@/types/video';
 
 interface VideoPickerModalProps {
@@ -33,36 +49,73 @@ export function VideoPickerModal({
 }: VideoPickerModalProps) {
   const [searchInput, setSearchInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [authorPubkey, setAuthorPubkey] = useState<string | null>(null);
+  const [authorInputValue, setAuthorInputValue] = useState('');
+  const [authorPopoverOpen, setAuthorPopoverOpen] = useState(false);
   const searchTimeoutRef = useRef<NodeJS.Timeout>();
 
-  const { data: allVideos = [], isLoading } = useShortFormVideos(searchQuery);
-  
-  // Filter out blocked users
-  const videos = allVideos.filter(video => !blocklist.includes(video.pubkey));
+  const trimmed = searchInput.trim();
+  const effectiveSearch = trimmed;
+
+  const effectiveAuthor = authorPubkey;
+  const { data: allVideos = [], isLoading } = useShortFormVideos(
+    searchQuery || undefined,
+    effectiveAuthor || undefined
+  );
+
+  const { data: contactList } = useContactList();
+  const followedPubkeys = useMemo(() => {
+    if (!contactList?.tags) return [];
+    return contactList.tags
+      .filter((tag): tag is [string, string] => tag[0] === 'p' && !!tag[1])
+      .map(([, pubkey]) => pubkey);
+  }, [contactList?.tags]);
+
+  const { data: authorDisplayNames = {} } = useBulkAuthorMetadata(followedPubkeys);
+
+  const videos = allVideos.filter((v) => !blocklist.includes(v.pubkey));
+
 
   useEffect(() => {
     if (!open) {
       setSearchInput('');
       setSearchQuery('');
+      setAuthorPubkey(null);
+      setAuthorInputValue('');
     }
   }, [open]);
 
-  // Debounce search
   useEffect(() => {
-    if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current);
+    const v = authorInputValue.trim();
+    if (!v) {
+      setAuthorPubkey(null);
+      return;
     }
-
-    searchTimeoutRef.current = setTimeout(() => {
-      setSearchQuery(searchInput);
-    }, 500);
-
-    return () => {
-      if (searchTimeoutRef.current) {
-        clearTimeout(searchTimeoutRef.current);
+    const isNpubLike = /^n(pub|profile)1[a-z0-9]+$/i.test(v);
+    if (isNpubLike) {
+      try {
+        const decoded = nip19.decode(v);
+        if (decoded.type === 'npub') {
+          setAuthorPubkey(decoded.data);
+          return;
+        }
+        if (decoded.type === 'nprofile') {
+          setAuthorPubkey(decoded.data.pubkey);
+          return;
+        }
+      } catch {
+        // leave author unchanged on decode error
       }
+    }
+  }, [authorInputValue]);
+
+  useEffect(() => {
+    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    searchTimeoutRef.current = setTimeout(() => setSearchQuery(effectiveSearch), 500);
+    return () => {
+      if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
     };
-  }, [searchInput]);
+  }, [effectiveSearch]);
 
 
 
@@ -91,17 +144,76 @@ export function VideoPickerModal({
               Blocklist
             </Button>
           </div>
-          <div className="relative mt-4">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search videos on Nostr..."
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              className="pl-10 h-12"
-            />
-            {isLoading && (
-              <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
-            )}
+          <div className="flex flex-col sm:flex-row gap-3 mt-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search videos…"
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                className="pl-10 h-12"
+              />
+              {isLoading && (
+                <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
+              )}
+            </div>
+            <Popover open={authorPopoverOpen} onOpenChange={setAuthorPopoverOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={authorPopoverOpen}
+                  className="w-full sm:w-[280px] h-12 justify-between font-normal"
+                >
+                  <span className="truncate">
+                    {authorInputValue || 'From people I follow or paste npub…'}
+                  </span>
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+                <Command
+                  shouldFilter={true}
+                  value={authorInputValue}
+                  onValueChange={(v) => setAuthorInputValue(v)}
+                >
+                  <CommandInput placeholder="Type name or paste npub…" />
+                  <CommandList>
+                    <CommandEmpty>No one found. Paste an npub to filter by that user.</CommandEmpty>
+                    <CommandGroup>
+                      <CommandItem
+                        value="All videos"
+                        onSelect={() => {
+                          setAuthorPubkey(null);
+                          setAuthorInputValue('');
+                          setAuthorPopoverOpen(false);
+                        }}
+                      >
+                        <Check className={!authorPubkey ? 'mr-2 h-4 w-4 opacity-100' : 'mr-2 h-4 w-4 opacity-0'} />
+                        All videos
+                      </CommandItem>
+                      {followedPubkeys.map((pubkey) => {
+                        const label = authorDisplayNames[pubkey] ?? `${pubkey.slice(0, 8)}…`;
+                        return (
+                          <CommandItem
+                            key={pubkey}
+                            value={label}
+                            onSelect={() => {
+                              setAuthorPubkey(pubkey);
+                              setAuthorInputValue(label);
+                              setAuthorPopoverOpen(false);
+                            }}
+                          >
+                            <Check className={authorPubkey === pubkey ? 'mr-2 h-4 w-4 opacity-100' : 'mr-2 h-4 w-4 opacity-0'} />
+                            {label}
+                          </CommandItem>
+                        );
+                      })}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
           </div>
         </DialogHeader>
 
@@ -123,7 +235,11 @@ export function VideoPickerModal({
             </div>
           ) : videos.length === 0 ? (
             <div className="flex items-center justify-center h-full text-muted-foreground">
-              {searchQuery ? 'No videos found for your search' : 'No videos available'}
+              {effectiveAuthor
+                ? 'No videos from this user'
+                : searchQuery
+                  ? 'No videos found for your search'
+                  : 'No videos available'}
             </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 pb-4">
