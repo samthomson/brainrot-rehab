@@ -106,19 +106,16 @@ function SourceVideoCard({ source }: { source: Video }) {
       </div>
       <div className="min-w-0 flex-1 py-0.5 flex flex-col justify-between">
         <div>
-          <p className="font-medium text-sm truncate overline decoration-primary decoration-2" title={source.name}>
-            {source.name}
-          </p>
-          <p className="text-xs text-muted-foreground mt-0.5">
+          <p className="font-medium text-sm mt-0.5">
             <Link
               to={`/profile/${nip19.npubEncode(source.pubkey)}`}
-              className="text-foreground underline decoration-primary decoration-1 hover:text-primary"
+              className="text-foreground hover:text-primary"
               onClick={(e) => e.stopPropagation()}
             >
               {displayName}
             </Link>
           </p>
-          <p className="text-xs text-muted-foreground">{formatDate(source.publishedAt)}</p>
+          <p className="text-xs text-muted-foreground mt-0.5">{formatDate(source.publishedAt)}</p>
           {source.event.tags.filter(([t]) => t === 't').length > 0 && (
             <div className="flex flex-wrap gap-1 mt-1">
               {source.event.tags

@@ -28,9 +28,10 @@ export function BrainrotLayout() {
             <div className="flex items-center gap-8">
               <Link to="/rot" className="flex items-center gap-3 group">
                 <BrainrotLogo />
-                <span className="flex items-baseline gap-0.5 text-xl font-sans">
-                  <span className="font-black tracking-tight text-primary">brainrot</span>
-                  <span className="font-bold text-foreground tracking-wide">.rehab</span>
+                <span className="flex items-baseline gap-0 text-xl font-sans">
+                  <span className="font-black tracking-tight text-primary underline decoration-foreground decoration-2 underline-offset-[0.47rem]">brainrot</span>
+                  <span className="font-bold text-foreground tracking-wide">.</span>
+                  <span className="font-bold text-foreground tracking-wide underline decoration-primary decoration-2 underline-offset-[0.47rem]">rehab</span>
                 </span>
               </Link>
               <nav className="flex items-center gap-1.5">
