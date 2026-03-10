@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import { Link, useLocation } from 'react-router-dom';
-import { Film } from 'lucide-react';
+import { BrainrotLogo } from '@/components/BrainrotLogo';
 import { LoginArea } from '@/components/auth/LoginArea';
 import { SettingsModal } from '@/components/SettingsModal';
 import { usePersistedState } from '@/hooks/usePersistedState';
@@ -21,24 +21,26 @@ export function BrainrotLayout() {
   const [additionalRelays, setAdditionalRelays] = usePersistedState<string[]>('video-remix-additional-relays', []);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-zinc-50 to-neutral-100 dark:from-slate-950 dark:via-zinc-950 dark:to-neutral-950">
-      <header className="sticky top-0 z-50 border-b border-foreground/10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <div className="min-h-screen bg-background">
+      <header className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-xl">
         <div className="max-w-6xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-6">
-              <Link to="/rot" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-                <Film className="h-6 w-6" />
-                <span className="font-bold text-lg">brainrot.rehab</span>
+            <div className="flex items-center gap-10">
+              <Link to="/rot" className="flex items-center gap-3">
+                <BrainrotLogo />
+                <span className="font-semibold text-lg tracking-tight">
+                  brainrot.rehab
+                </span>
               </Link>
-              <nav className="flex items-center gap-6">
+              <nav className="flex items-center gap-2">
                 {navItems.map(({ path, label }) => (
                   <Link
                     key={path}
                     to={path}
-                    className={`text-sm font-medium transition-colors ${
+                    className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${
                       location.pathname === path
-                        ? 'text-foreground underline underline-offset-4'
-                        : 'text-muted-foreground hover:text-foreground'
+                        ? 'text-foreground bg-secondary'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-secondary/50'
                     }`}
                   >
                     {label}
