@@ -217,12 +217,6 @@ export async function runJob(
     return
   }
 
-  console.log(`Job ${requestId}: received response event:`, {
-    id: signEventResponse.id,
-    kind: signEventResponse.kind,
-    content_preview: signEventResponse.content.slice(0, 200)
-  })
-  
   const signedContent = signEventResponse.content
   let signedEv: NostrEvent
   try {
@@ -240,25 +234,12 @@ export async function runJob(
     return
   }
 
-  console.log(`Job ${requestId}: parsed signed event:`, {
-    id: signedEv.id,
-    kind: signedEv.kind,
-    pubkey: signedEv.pubkey,
-    tags: signedEv.tags,
-    content: signedEv.content
-  })
-  
-  console.log(`Job ${requestId}: publishing signed video (kind ${VIDEO_KIND})`)
-  console.log(`   Event ID: ${signedEv.id}`)
-  console.log(`   Pubkey: ${signedEv.pubkey}`)
-  console.log(`   Tags:`, signedEv.tags)
-  
   const publishResults = await Promise.allSettled(pool.publish(relays, signedEv))
   const rejected = publishResults.filter(r => r.status === 'rejected')
   if (rejected.length > 0) {
     console.error(`⚠️ Some relays rejected video event:`, rejected.map(r => (r as PromiseRejectedResult).reason))
   }
-  
+
   console.log(`Job ${requestId}: publishing success task`)
   const successEvent = signEvent(
     buildTaskEvent(requestId, customerPubkey, { type: 'success', result_event_id: signedEv.id }),
