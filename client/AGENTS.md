@@ -1,5 +1,7 @@
 # Project Overview
 
+**Agent rules:** Follow the user's instructions. Do not remove, delete, or change code/config/env the user did not ask to change. Do not introduce optionality or extra options they did not ask for.
+
 This project is a Nostr client application built with React 18.x, TailwindCSS 3.x, Vite, shadcn/ui, and Nostrify.
 
 ## Technology Stack

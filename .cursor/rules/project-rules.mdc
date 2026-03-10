@@ -1,5 +1,5 @@
 ---
-description: Never duplicate defaults or config; one source of truth per value
+description: Project rules: single source of truth; follow user instructions; minimal changes
 alwaysApply: true
 ---
 
@@ -9,3 +9,9 @@ alwaysApply: true
 - Prefer **code** as that place (e.g. a named constant). Env or config files should only override, not re-state the same default.
 - If adding a new default: define it once (typically in the app that uses it), and have docs/env reference it (e.g. "leave unset for default" or "see DEFAULT_X in src/...").
 - When you find the same value in two places, remove the duplicate and keep the single canonical definition.
+
+# Follow user instructions
+
+- **Do not remove, delete, or strip out** code, config, comments, or env vars that the user did not ask to remove. Make only the change the user asked for.
+- **Do not disobey the user.** When they specify how something should work or what to document, do it that way. Do not introduce optional flows or extra options they did not ask for.
+- When in doubt, ask or make the minimal change.
