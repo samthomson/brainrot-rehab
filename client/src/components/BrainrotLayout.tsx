@@ -22,25 +22,26 @@ export function BrainrotLayout() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-xl">
+      <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur-xl">
         <div className="max-w-6xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-10">
-              <Link to="/rot" className="flex items-center gap-3">
+            <div className="flex items-center gap-8">
+              <Link to="/rot" className="flex items-center gap-3 group">
                 <BrainrotLogo />
-                <span className="font-semibold text-lg tracking-tight">
-                  brainrot.rehab
+                <span className="flex items-baseline gap-0.5 text-xl font-sans">
+                  <span className="font-black tracking-tight text-primary">brainrot</span>
+                  <span className="font-bold text-foreground tracking-wide">.rehab</span>
                 </span>
               </Link>
-              <nav className="flex items-center gap-2">
+              <nav className="flex items-center gap-1.5">
                 {navItems.map(({ path, label }) => (
                   <Link
                     key={path}
                     to={path}
-                    className={`px-4 py-2 text-sm font-medium rounded-lg transition-all ${
+                    className={`relative px-5 py-2.5 text-sm font-semibold rounded-full transition-all duration-200 ${
                       location.pathname === path
-                        ? 'text-foreground bg-secondary'
-                        : 'text-muted-foreground hover:text-foreground hover:bg-secondary/50'
+                        ? 'bg-primary text-primary-foreground shadow-[0_0_18px_hsl(var(--primary)/0.45)]'
+                        : 'text-muted-foreground hover:text-primary border border-transparent hover:border-primary/40 hover:bg-primary/5'
                     }`}
                   >
                     {label}

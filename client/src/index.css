@@ -4,34 +4,34 @@
 
 @layer base {
   :root {
-    /* Clean Apple White + Black Mirror accents */
-    --background: 0 0% 100%;
-    --foreground: 0 0% 10%;
+    /* Light grey off-white + neon green accent */
+    --background: 0 0% 96%;
+    --foreground: 0 0% 12%;
 
     --card: 0 0% 98%;
-    --card-foreground: 0 0% 10%;
+    --card-foreground: 0 0% 12%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 10%;
+    --popover: 0 0% 98%;
+    --popover-foreground: 0 0% 12%;
 
-    --primary: 0 0% 10%;
+    --primary: 132 100% 32%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 0 0% 96%;
-    --secondary-foreground: 0 0% 10%;
+    --secondary: 0 0% 92%;
+    --secondary-foreground: 0 0% 12%;
 
-    --muted: 0 0% 96%;
-    --muted-foreground: 0 0% 45%;
+    --muted: 0 0% 92%;
+    --muted-foreground: 0 0% 42%;
 
-    --accent: 0 0% 96%;
-    --accent-foreground: 0 0% 10%;
+    --accent: 0 0% 92%;
+    --accent-foreground: 0 0% 12%;
 
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 0 0% 90%;
-    --input: 0 0% 96%;
-    --ring: 0 0% 10%;
+    --border: 0 0% 88%;
+    --input: 0 0% 92%;
+    --ring: 132 100% 32%;
 
     --radius: 0.75rem;
   }
@@ -98,24 +98,23 @@
     animation: glitch 0.5s ease-in-out;
   }
 
-  /* Logo colour-invert flicker - every 5s, then 2s of fast/slow flicker and pulse */
+  /* Logo: fast flickers less often (every 9s), with subtle buzz during flash */
   @keyframes logo-invert-flicker {
-    0%, 60% { filter: invert(0); }
-    61% { filter: invert(1); }
-    62% { filter: invert(0); }
-    65% { filter: invert(1); }
-    75% { filter: invert(0); }
-    76% { filter: invert(1); }
-    77% { filter: invert(0); }
-    82% { filter: invert(1); }
-    90% { filter: invert(0); }
-    91% { filter: invert(1); }
-    92% { filter: invert(0); }
-    100% { filter: invert(0); }
+    0%, 78%, 100% { filter: invert(0); transform: translate(0, 0) rotate(0deg); }
+    79% { filter: invert(1); transform: translate(0, -1px) rotate(-2deg); }
+    80% { filter: invert(0); transform: translate(1px, 1px) rotate(1deg); }
+    81% { filter: invert(1); transform: translate(-1px, 0) rotate(-3deg); }
+    82% { filter: invert(0); transform: translate(0, 1px) rotate(2deg); }
+    83% { filter: invert(1); transform: translate(-1px, -1px) rotate(-2deg); }
+    84% { filter: invert(0); transform: translate(1px, 0) rotate(1deg); }
+    85% { filter: invert(1); transform: translate(0, -2px) rotate(-3deg); }
+    86% { filter: invert(0); transform: translate(-1px, 1px) rotate(2deg); }
+    87% { filter: invert(1); transform: translate(1px, 1px) rotate(-1deg); }
+    88% { filter: invert(0); transform: translate(0, 0) rotate(0deg); }
   }
 
   .logo-invert-flicker {
-    animation: logo-invert-flicker 5s ease-in-out infinite;
+    animation: logo-invert-flicker 9s steps(1) infinite;
   }
 
   /* Apple-style scrollbar */

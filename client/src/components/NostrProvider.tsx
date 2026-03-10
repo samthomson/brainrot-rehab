@@ -45,16 +45,16 @@ const NostrProvider: React.FC<NostrProviderProps> = (props) => {
           routes.set(url, filters);
         }
 
-        // Always include brainrot relay for kind 34236 (video) queries
+        // 34236 = video events, 30534 = DVM job/task events (Rehab polls for job status)
         const needsBrainrot = filters.some(
-          f => f.kinds?.includes(34236)
+          f => f.kinds?.includes(34236) || f.kinds?.includes(30534)
         );
         if (needsBrainrot && !routes.has(BRAINROT_RELAY_URL)) {
           routes.set(BRAINROT_RELAY_URL, filters);
         }
 
         if (needsBrainrot) {
-          console.log('[brainrot-debug] Relays for kind 34236:', [...routes.keys()]);
+          console.log('[brainrot-debug] Relays for brainrot kinds:', [...routes.keys()]);
         }
 
         return routes;

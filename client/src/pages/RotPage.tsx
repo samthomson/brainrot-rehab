@@ -43,25 +43,15 @@ export default function RotPage() {
             </Link>
           </div>
         ) : (
-          <>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-5">
-              {videos.map((video) => (
-                <VideoCard
-                  key={video.id}
-                  video={video}
-                  onClick={() => setLightboxVideo(video)}
-                />
-              ))}
-            </div>
-            {import.meta.env.DEV && (
-              <details className="mt-8 p-4 bg-muted rounded-lg">
-                <summary className="cursor-pointer font-semibold">Debug: Raw Events</summary>
-                <pre className="mt-4 text-xs overflow-auto max-h-96">
-                  {JSON.stringify(videos.map(v => v.event), null, 2)}
-                </pre>
-              </details>
-            )}
-          </>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-5">
+            {videos.map((video) => (
+              <VideoCard
+                key={video.id}
+                video={video}
+                onClick={() => setLightboxVideo(video)}
+              />
+            ))}
+          </div>
         )}
 
         <VideoLightbox

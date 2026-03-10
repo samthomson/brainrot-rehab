@@ -16,7 +16,7 @@ import { ZapDialog } from '@/components/ZapDialog';
 import { useIsFollowing, useToggleFollow } from '@/hooks/useFollow';
 import { UserPlus, UserMinus } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
-import { Heart, Repeat2, MessageSquare, Send, Zap } from 'lucide-react';
+import { Heart, Repeat2, MessageSquare, Send, Zap, Play, Pause } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { nip19 } from 'nostr-tools';
 import { Link } from 'react-router-dom';
@@ -77,9 +77,9 @@ function SourceVideoCard({ source }: { source: Video }) {
   };
 
   return (
-    <div className="flex gap-3 rounded-xl border bg-card p-2 shadow-sm overflow-hidden">
+    <div className="flex gap-3 rounded-xl border bg-card p-2 shadow-sm overflow-hidden font-sans">
       <div 
-        className="w-20 h-20 shrink-0 rounded-lg bg-black overflow-hidden cursor-pointer hover:opacity-90 transition-opacity"
+        className="relative w-[7.5rem] h-[7.5rem] shrink-0 rounded-lg bg-black overflow-hidden cursor-pointer group"
         onClick={togglePlay}
       >
         <video
@@ -91,17 +91,28 @@ function SourceVideoCard({ source }: { source: Video }) {
           preload="metadata"
           crossOrigin="anonymous"
           loop
+          onPlay={() => setIsPlaying(true)}
+          onPause={() => setIsPlaying(false)}
         />
+        <div className="absolute inset-0 flex items-end justify-end p-1.5 pointer-events-none">
+          <div className="rounded-full bg-primary/90 text-primary-foreground p-1 shadow-sm">
+            {isPlaying ? (
+              <Pause className="h-4 w-4 fill-current" />
+            ) : (
+              <Play className="h-4 w-4 fill-current ml-0.5" />
+            )}
+          </div>
+        </div>
       </div>
       <div className="min-w-0 flex-1 py-0.5 flex flex-col justify-between">
         <div>
-          <p className="font-medium text-sm truncate" title={source.name}>
+          <p className="font-medium text-sm truncate overline decoration-primary decoration-2" title={source.name}>
             {source.name}
           </p>
           <p className="text-xs text-muted-foreground mt-0.5">
             <Link
               to={`/profile/${nip19.npubEncode(source.pubkey)}`}
-              className="text-foreground underline hover:text-primary"
+              className="text-foreground underline decoration-primary decoration-1 hover:text-primary"
               onClick={(e) => e.stopPropagation()}
             >
               {displayName}
@@ -114,7 +125,7 @@ function SourceVideoCard({ source }: { source: Video }) {
                 .filter(([t]) => t === 't')
                 .slice(0, 5)
                 .map(([, tag], i) => (
-                  <span key={i} className="text-xs text-blue-500">
+                  <span key={i} className="text-xs text-primary">
                     #{tag}
                   </span>
                 ))}
@@ -129,7 +140,7 @@ function SourceVideoCard({ source }: { source: Video }) {
                 href={diVineUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-xs text-blue-500 hover:text-blue-600 hover:underline"
+                className="text-xs text-primary hover:underline"
                 onClick={(e) => e.stopPropagation()}
               >
                 View on diVine →
@@ -150,8 +161,8 @@ function SourceRefFallbackCard({ sourceRef }: { sourceRef: SourceRef }) {
     (sourceRef.pubkey ? `${sourceRef.pubkey.slice(0, 8)}...` : 'Unknown');
 
   return (
-    <div className="flex gap-3 rounded-xl border border-dashed bg-muted/30 p-3 overflow-hidden">
-      <div className="w-20 h-20 shrink-0 rounded-lg bg-muted flex items-center justify-center text-muted-foreground text-xs">
+    <div className="flex gap-3 rounded-xl border border-dashed bg-muted/30 p-3 overflow-hidden font-sans">
+      <div className="w-[7.5rem] h-[7.5rem] shrink-0 rounded-lg bg-muted flex items-center justify-center text-muted-foreground text-xs">
         No preview
       </div>
       <div className="min-w-0 flex-1 py-0.5">
@@ -294,8 +305,8 @@ export function VideoLightbox({ video, open, onOpenChange }: VideoLightboxProps)
         <DialogTitle className="sr-only">{video.name}</DialogTitle>
 
         <div className="flex flex-row h-[85vh]">
-          {/* Main video — left side */}
-          <div className="w-[45%] shrink-0 bg-black">
+          {/* Main video — left side; rounded to match modal */}
+          <div className="w-[45%] shrink-0 bg-muted rounded-l-xl overflow-hidden">
             <video
               ref={videoRef}
               src={video.url}
@@ -310,7 +321,7 @@ export function VideoLightbox({ video, open, onOpenChange }: VideoLightboxProps)
 
           {/* Right side: metadata, reactions, comments, sources */}
           <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">
-            <div className="p-6 space-y-4">
+            <div className="p-6 space-y-6">
               {/* Video metadata */}
               <div>
                 <p className="font-semibold text-lg">{video.name}</p>
@@ -360,7 +371,7 @@ export function VideoLightbox({ video, open, onOpenChange }: VideoLightboxProps)
               </div>
 
               {/* Reactions & Actions */}
-              <div className="flex items-center gap-1.5 border-y py-3">
+              <div className="flex items-center gap-1.5 border-y border-border py-4">
                 <Button
                   variant="ghost"
                   size="sm"
@@ -411,7 +422,7 @@ export function VideoLightbox({ video, open, onOpenChange }: VideoLightboxProps)
               </div>
 
               {/* Comment input */}
-              <div className="space-y-2">
+              <div className="space-y-3 pt-1">
                 <Textarea
                   placeholder="Add a comment..."
                   value={commentText}
@@ -436,7 +447,7 @@ export function VideoLightbox({ video, open, onOpenChange }: VideoLightboxProps)
 
               {/* Source videos */}
               {hasSources && (
-                <div className="border-t pt-4">
+                <div className="border-t border-border pt-6 mt-2">
                   <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide mb-3">
                     Source videos ({sourceRefs.length})
                   </h3>
