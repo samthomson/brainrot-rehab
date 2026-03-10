@@ -1,11 +1,15 @@
-# Env: DVM_SECRET_KEY (required) - hex private key for DVM's Nostr identity. Generate: openssl rand -hex 32
-# Optional: RELAYS (default wss://relay.brainrot.rehab). Configure domain via Dokploy UI.
+# Env for Dokploy:
+#   DVM_SECRET_KEY (required) - hex private key for DVM. Generate: openssl rand -hex 32. Set on dvm service.
+#   VITE_DVM_PUBKEY (optional) - DVM public key (64 hex) for client default. Set as build arg when building client.
+#   RELAYS (optional) - default wss://relay.brainrot.rehab. Set on dvm service.
 
 services:
   client:
     build:
       context: ./client
       dockerfile: Dockerfile.prod
+      args:
+        - VITE_DVM_PUBKEY=${VITE_DVM_PUBKEY}
     restart: always
     expose:
       - "3000"

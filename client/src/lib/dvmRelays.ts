@@ -2,10 +2,10 @@
 export const BRAINROT_RELAY_URL = 'wss://relay.brainrot.rehab';
 
 /** Default Blossom server URL for DVM video uploads. */
-export const DEFAULT_BLOSSOM_UPLOAD_URL = 'https://bs.samt.st';
+export const DEFAULT_BLOSSOM_UPLOAD_URL = 'https://blossom.brainrot.rehab';
 
-/** Default DVM public key for brainrot.rehab DVM. */
-export const DEFAULT_DVM_PUBKEY = '809afaba5cf5ce7e0be8bce15eea3faaa4dc8fbc74736c4f1dafd5e3e37a7855';
+/** DVM public key (64 hex). Must be set via VITE_DVM_PUBKEY at build time or by the user in Settings. No fallback. */
+export const DEFAULT_DVM_PUBKEY = (import.meta.env.VITE_DVM_PUBKEY as string | undefined)?.trim() ?? '';
 
 /** Client tag for brainrot.rehab videos (filter feeds by this). */
 export const BRAINROT_CLIENT_TAG = 'brainrot.rehab';

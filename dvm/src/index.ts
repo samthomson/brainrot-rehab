@@ -33,30 +33,30 @@ const pool = new SimplePool()
 
 // Only process job requests created after DVM startup (avoid processing old requests)
 const startupTime = Math.floor(Date.now() / 1000)
-
-const sub = pool.subscribe(
-  RELAYS,
-  { kinds: [JOB_REQUEST_KIND], since: startupTime },
-  {
-    onevent(ev: NostrEvent) {
-      console.log('📥 Received job request:', {
-        id: ev.id,
-        kind: ev.kind,
-        pubkey: ev.pubkey.slice(0, 8),
-        created_at: new Date(ev.created_at * 1000).toISOString(),
-      })
-      console.log('📄 Job content preview:', ev.content.slice(0, 200) + '...')
-      runJob(pool, RELAYS, secretKey, ev).catch((e) => {
-        console.error('❌ Job failed', ev.id, e)
-      })
-    },
-    oneose() {
-      console.log('✅ Subscription established (EOSE received)')
-    },
-  }
-)
+const filter = { kinds: [JOB_REQUEST_KIND], since: startupTime }
 
 console.log('DVM listening for kind', JOB_REQUEST_KIND, 'on', RELAYS)
+console.log('📋 Subscription filter:', JSON.stringify(filter))
 
-// Keep process alive with an interval (prevents Node from exiting when relay is unreachable)
-setInterval(() => {}, 30_000)
+const sub = pool.subscribe(RELAYS, filter, {
+  onevent(ev: NostrEvent) {
+    console.log('📥 Received job request:', {
+      id: ev.id,
+      kind: ev.kind,
+      pubkey: ev.pubkey.slice(0, 8),
+      created_at: new Date(ev.created_at * 1000).toISOString(),
+    })
+    console.log('📄 Job content preview:', ev.content.slice(0, 200) + (ev.content.length > 200 ? '...' : ''))
+    runJob(pool, RELAYS, secretKey, ev).catch((e) => {
+      console.error('❌ Job failed', ev.id, e)
+    })
+  },
+  oneose() {
+    console.log('✅ Subscription established (EOSE received)')
+  },
+})
+
+// Heartbeat so logs show the process is alive and still subscribed
+setInterval(() => {
+  console.log('💓 DVM alive, waiting for kind', JOB_REQUEST_KIND)
+}, 60_000)

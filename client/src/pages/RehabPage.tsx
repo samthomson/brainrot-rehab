@@ -39,11 +39,8 @@ export default function RehabPage() {
   const [additionalRelays] = usePersistedState<string[]>('video-remix-additional-relays', []);
   const relayPool = [BRAINROT_RELAY_URL, ...additionalRelays];
   const [blossomUploadUrl] = usePersistedState<string>('video-remix-blossom-url', DEFAULT_BLOSSOM_UPLOAD_URL);
-  const [dvmPubkey, setDvmPubkey] = usePersistedState<string>('video-remix-dvm-pubkey', DEFAULT_DVM_PUBKEY);
+  const [dvmPubkey] = usePersistedState<string>('video-remix-dvm-pubkey', DEFAULT_DVM_PUBKEY);
 
-  if (!dvmPubkey) {
-    setDvmPubkey(DEFAULT_DVM_PUBKEY);
-  }
   const [caption, setCaption] = useState('');
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [isClearDialogOpen, setIsClearDialogOpen] = useState(false);

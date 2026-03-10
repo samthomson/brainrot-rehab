@@ -245,7 +245,32 @@ The DVM is a Nostr actor. It publishes events (feedback, tasks, results) that mu
 
 ## Production (Dokploy)
 
-Compose path: `./docker-compose.prod.yml`. Set `DVM_SECRET_KEY` in Dokploy env (generate: `openssl rand -hex 32`). Configure domain via Dokploy Domains UI.
+Compose path: `./docker-compose.prod.yml`.
+
+### DVM keys: where they’re used and where to set them
+
+| Key | Who uses it | Purpose | Necessary? |
+|-----|--------------|---------|------------|
+| **Private key** (secret) | DVM only | The DVM signs all its events (job feedback, “sign Blossom”, “sign event”, success, result) with this key. It’s the DVM’s Nostr identity. | Yes. Without it the DVM has no identity and can’t sign. |
+| **Public key** | Client | The client subscribes to task events (kind 30534) with `authors: [dvmPubkey]`. It must use the same pubkey as the DVM so it receives “please sign this” tasks. | Yes for the flow to work. If the client’s DVM pubkey is wrong, it never sees the DVM’s tasks and stays on “Waiting for DVM…”. |
+
+The DVM **never** needs the pubkey in config: it derives the pubkey from the secret and logs it at startup. Only the **client** needs to be given that pubkey (build-time default or Settings).
+
+### Where to set them in Dokploy
+
+1. **DVM service (runtime env)**  
+   - **`DVM_SECRET_KEY`** — hex private key (64 hex chars).  
+   - Generate once: `openssl rand -hex 32`  
+   - Set in Dokploy as an env var for the **dvm** service.  
+   - After the DVM starts, logs show: `DVM Public Key: <64 hex chars>`. Copy that value for step 2.
+
+2. **Client service (build-time arg)**  
+   - **`VITE_DVM_PUBKEY`** — the DVM’s public key (the 64 hex chars from the log).  
+   - Set in Dokploy as a **build argument** for the **client** image:  
+     `VITE_DVM_PUBKEY=<paste the DVM public key here>`  
+   - Rebuild the client image after setting it so the built app uses that pubkey by default.
+
+If you don’t set `VITE_DVM_PUBKEY` when building the client, the app uses a hardcoded default (the original dev DVM pubkey). Then either set the correct DVM pubkey in **Settings** in the app, or rebuild the client with `VITE_DVM_PUBKEY` set.
 
 ---
 

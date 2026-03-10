@@ -21,10 +21,6 @@ export function BrainrotLayout() {
   const [blossomUploadUrl, setBlossomUploadUrl] = usePersistedState<string>('video-remix-blossom-url', DEFAULT_BLOSSOM_UPLOAD_URL);
   const [additionalRelays, setAdditionalRelays] = usePersistedState<string[]>('video-remix-additional-relays', []);
 
-  if (!dvmPubkey) {
-    setDvmPubkey(DEFAULT_DVM_PUBKEY);
-  }
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-zinc-50 to-neutral-100 dark:from-slate-950 dark:via-zinc-950 dark:to-neutral-950">
       <header className="sticky top-0 z-50 border-b border-foreground/10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">

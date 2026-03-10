@@ -63,7 +63,7 @@ export function useDVMJob(dvmPubkey: string, relays: string[]) {
 
   // Subscribe to task events
   useEffect(() => {
-    if (!currentJobId || relays.length === 0) return;
+    if (!currentJobId || relays.length === 0 || !dvmPubkey) return;
 
     const jobId = currentJobId;
     // Subscribe to events from 2 seconds ago to ensure we don't miss any due to clock skew
@@ -228,7 +228,7 @@ export function useDVMJob(dvmPubkey: string, relays: string[]) {
     });
 
     return () => controller.abort();
-  }, [currentJobId, relays.join(','), nostr, user?.pubkey, toast]);
+  }, [currentJobId, dvmPubkey, relays.join(','), nostr, user?.pubkey, toast]);
 
   const broadcastJob = useCallback(
     async (remixData: unknown): Promise<void> => {
@@ -236,6 +236,15 @@ export function useDVMJob(dvmPubkey: string, relays: string[]) {
         toast({
           title: 'Login Required',
           description: 'Please login with Nostr to broadcast job requests',
+          variant: 'destructive',
+        });
+        return;
+      }
+      if (!dvmPubkey) {
+        setJobState({ status: 'error', errorMessage: 'DVM pubkey not set. Set it in Settings.' });
+        toast({
+          title: 'DVM pubkey required',
+          description: 'Set the DVM pubkey in Settings to publish.',
           variant: 'destructive',
         });
         return;
@@ -284,7 +293,8 @@ export function useDVMJob(dvmPubkey: string, relays: string[]) {
         
         // Small delay to ensure subscription is established
         await new Promise(resolve => setTimeout(resolve, 100));
-        
+
+        console.log('[DVM] Publishing job 5342 to relays:', relays);
         await publishToPool(nostr, relays, signedEvent);
 
         toast({
@@ -301,7 +311,7 @@ export function useDVMJob(dvmPubkey: string, relays: string[]) {
         });
       }
     },
-    [user, nostr, relays, toast]
+    [user, dvmPubkey, nostr, relays, toast]
   );
 
   return {
