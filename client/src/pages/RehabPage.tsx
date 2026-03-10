@@ -57,7 +57,7 @@ export default function RehabPage() {
     const newSegment: SourceSegment = { id: crypto.randomUUID(), video: sourceVideo };
     setSourceSegments((prev) => [...prev, newSegment]);
 
-    const fullDuration = sourceVideo.duration ?? 5;
+    const fullDuration = sourceVideo.duration || 0;
     const timelineSegment: TimelineSegment = {
       id: newSegment.id,
       sourceVideoId: sourceVideo.id,
@@ -75,7 +75,7 @@ export default function RehabPage() {
   const handleDuplicateVideo = (video: SourceVideo) => {
     const newSegment: SourceSegment = { id: crypto.randomUUID(), video };
     setSourceSegments((prev) => [...prev, newSegment]);
-    const fullDuration = video.duration ?? 5;
+    const fullDuration = video.duration || 0;
     const timelineSegment: TimelineSegment = {
       id: newSegment.id,
       sourceVideoId: video.id,
@@ -247,15 +247,14 @@ export default function RehabPage() {
                 <div className="space-y-4">
                   <RemixPreview segments={timelineSegments} sourceVideos={sourceVideos} />
                   {timelineSegments.length > 0 && (
-                    <div className="space-y-3">
-                      <div className="space-y-2">
-                        <Label htmlFor="caption">Caption</Label>
+                    <div className="space-y-4 pt-2">
+                      <div className="space-y-1.5">
+                        <Label htmlFor="caption" className="text-sm font-semibold">Caption</Label>
                         <Input
                           id="caption"
                           placeholder="Add a caption for your video..."
                           value={caption}
                           onChange={(e) => setCaption(e.target.value)}
-                          className="max-w-md"
                         />
                       </div>
                       <BroadcastButton

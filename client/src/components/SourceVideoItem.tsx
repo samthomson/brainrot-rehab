@@ -31,10 +31,14 @@ export function SourceVideoItem({
   onPlayingChange,
   shouldPause,
 }: SourceVideoItemProps) {
-  const [range, setRange] = useState<[number, number]>([initialStartTime ?? 0, initialEndTime ?? 5]);
+  const hasInitialRange = !!(initialEndTime && initialEndTime > 0);
+  const [range, setRange] = useState<[number, number]>(
+    hasInitialRange ? [initialStartTime ?? 0, initialEndTime!] : [0, 0]
+  );
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [videoDuration, setVideoDuration] = useState(0);
+  const [metadataLoaded, setMetadataLoaded] = useState(hasInitialRange);
   const videoRef = useRef<HTMLVideoElement>(null);
   const updateTimeoutRef = useRef<NodeJS.Timeout>();
 
@@ -42,17 +46,25 @@ export function SourceVideoItem({
     if (videoRef.current) {
       const duration = videoRef.current.duration;
       setVideoDuration(duration);
-      // Keep persisted trim when we have initial range from parent; only default to full when new
-      if (initialStartTime !== undefined && initialEndTime !== undefined) {
+      if (hasInitialRange) {
         setRange([
-          Math.min(initialStartTime, duration),
-          Math.min(initialEndTime, duration),
+          Math.min(initialStartTime ?? 0, duration),
+          Math.min(initialEndTime!, duration),
         ]);
       } else {
         setRange([0, duration]);
+        onSegmentChange(segmentId, {
+          sourceVideoId: video.id,
+          videoName: video.name,
+          videoEventId: video.event.id,
+          startTime: 0,
+          endTime: duration,
+          duration,
+        });
       }
+      setMetadataLoaded(true);
     }
-  }, [initialStartTime, initialEndTime]);
+  }, [initialStartTime, initialEndTime, hasInitialRange, segmentId, video.id, video.name, video.event.id, onSegmentChange]);
 
   const handleTimeUpdate = useCallback(() => {
     if (videoRef.current) {
@@ -99,8 +111,10 @@ export function SourceVideoItem({
     }
   }, [range, currentTime, isPlaying]);
 
-  // Debounced auto-update timeline when range changes
+  // Debounced auto-update timeline when range changes (only after metadata loaded)
   useEffect(() => {
+    if (!metadataLoaded) return;
+
     if (updateTimeoutRef.current) {
       clearTimeout(updateTimeoutRef.current);
     }
@@ -121,7 +135,7 @@ export function SourceVideoItem({
         clearTimeout(updateTimeoutRef.current);
       }
     };
-  }, [range[0], range[1], video.id, video.name, video.event.id, segmentId, onSegmentChange]);
+  }, [metadataLoaded, range[0], range[1], video.id, video.name, video.event.id, segmentId, onSegmentChange]);
 
   const maxDuration = videoDuration || video.duration || 100;
 
@@ -187,6 +201,7 @@ export function SourceVideoItem({
             </div>
 
             {/* Start/end and slider: under the video only */}
+            {metadataLoaded ? (
             <div className="space-y-3">
           <div className="flex justify-between items-center gap-4">
             <label className="flex items-center gap-2 text-sm font-medium shrink-0">
@@ -228,6 +243,11 @@ export function SourceVideoItem({
             onValueChange={(value) => setRange(value as [number, number])}
           />
             </div>
+            ) : (
+              <div className="h-16 flex items-center justify-center text-sm text-muted-foreground">
+                Loading video...
+              </div>
+            )}
           </div>
 
           <div className="flex flex-col gap-2 shrink-0">

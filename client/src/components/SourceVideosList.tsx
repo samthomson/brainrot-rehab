@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Plus, Trash2 } from 'lucide-react';
@@ -22,6 +22,25 @@ interface SourceVideosListProps {
   showClearButton: boolean;
 }
 
+function DropZone({ active, onDrop }: { active: boolean; onDrop: (e: React.DragEvent) => void }) {
+  const [hovering, setHovering] = useState(false);
+  return (
+    <div
+      onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }}
+      onDragEnter={(e) => { e.preventDefault(); setHovering(true); }}
+      onDragLeave={() => setHovering(false)}
+      onDrop={(e) => { setHovering(false); onDrop(e); }}
+      className={`transition-all duration-150 rounded-md ${
+        active
+          ? hovering
+            ? 'h-16 bg-primary/20 border-2 border-dashed border-primary my-1'
+            : 'h-4 my-0'
+          : 'h-0 my-0'
+      }`}
+    />
+  );
+}
+
 export function SourceVideosList({
   sourceSegments,
   timelineSegments,
@@ -34,24 +53,37 @@ export function SourceVideosList({
   showClearButton,
 }: SourceVideosListProps) {
   const [playingSegmentId, setPlayingSegmentId] = useState<string | null>(null);
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const dragNodeRef = useRef<HTMLDivElement | null>(null);
 
-  const handleDragStart = (e: React.DragEvent, index: number) => {
+  const handleDragStart = useCallback((e: React.DragEvent, index: number) => {
+    setDragIndex(index);
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', index.toString());
-  };
+    const el = e.currentTarget as HTMLDivElement;
+    dragNodeRef.current = el;
+    requestAnimationFrame(() => {
+      el.style.opacity = '0.35';
+    });
+  }, []);
 
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-  };
+  const handleDragEnd = useCallback(() => {
+    if (dragNodeRef.current) {
+      dragNodeRef.current.style.opacity = '';
+    }
+    setDragIndex(null);
+    dragNodeRef.current = null;
+  }, []);
 
-  const handleDrop = (e: React.DragEvent, toIndex: number) => {
+  const handleDropAtIndex = useCallback((toIndex: number) => (e: React.DragEvent) => {
     e.preventDefault();
     const fromIndex = parseInt(e.dataTransfer.getData('text/plain'));
-    if (fromIndex !== toIndex) {
-      onReorder(fromIndex, toIndex);
+    if (Number.isNaN(fromIndex)) return;
+    const adjustedTo = fromIndex < toIndex ? toIndex - 1 : toIndex;
+    if (fromIndex !== adjustedTo) {
+      onReorder(fromIndex, adjustedTo);
     }
-  };
+  }, [onReorder]);
 
   const handlePlayingChange = (segmentId: string, playing: boolean) => {
     if (playing) {
@@ -60,6 +92,8 @@ export function SourceVideosList({
       setPlayingSegmentId(null);
     }
   };
+
+  const isDragging = dragIndex !== null;
 
   if (sourceSegments.length === 0) {
     return (
@@ -96,32 +130,41 @@ export function SourceVideosList({
         )}
       </div>
 
-      <div className="space-y-3">
+      <div>
+        {/* Drop zone before first item */}
+        <DropZone active={isDragging && dragIndex !== 0} onDrop={handleDropAtIndex(0)} />
+
         {sourceSegments.map((segment, index) => (
-          <div
-            key={segment.id}
-            draggable
-            onDragStart={(e) => handleDragStart(e, index)}
-            onDragOver={handleDragOver}
-            onDrop={(e) => handleDrop(e, index)}
-          >
-            <SourceVideoItem
-              video={segment.video}
-              segmentId={segment.id}
-              index={index}
-              initialStartTime={timelineSegments.find((t) => t.id === segment.id)?.startTime}
-              initialEndTime={timelineSegments.find((t) => t.id === segment.id)?.endTime}
-              onRemove={onRemoveSegment}
-              onDuplicate={onDuplicateVideo}
-              onSegmentChange={onSegmentChange}
-              onPlayingChange={handlePlayingChange}
-              shouldPause={playingSegmentId !== null && playingSegmentId !== segment.id}
+          <div key={segment.id}>
+            <div
+              draggable
+              onDragStart={(e) => handleDragStart(e, index)}
+              onDragEnd={handleDragEnd}
+              className="transition-transform duration-150 cursor-grab active:cursor-grabbing py-1.5"
+            >
+              <SourceVideoItem
+                video={segment.video}
+                segmentId={segment.id}
+                index={index}
+                initialStartTime={timelineSegments.find((t) => t.id === segment.id)?.startTime}
+                initialEndTime={timelineSegments.find((t) => t.id === segment.id)?.endTime}
+                onRemove={onRemoveSegment}
+                onDuplicate={onDuplicateVideo}
+                onSegmentChange={onSegmentChange}
+                onPlayingChange={handlePlayingChange}
+                shouldPause={playingSegmentId !== null && playingSegmentId !== segment.id}
+              />
+            </div>
+            {/* Drop zone after each item */}
+            <DropZone
+              active={isDragging && dragIndex !== index && dragIndex !== index + 1}
+              onDrop={handleDropAtIndex(index + 1)}
             />
           </div>
         ))}
 
         {/* Big + Button at End */}
-        <Card className="border-dashed border-2 hover:border-primary/50 transition-colors">
+        <Card className="border-dashed border-2 hover:border-primary/50 transition-colors mt-3">
           <CardContent className="py-12 flex items-center justify-center">
             <Button onClick={onAddSourceVideo} size="lg" className="h-20 w-20 rounded-full">
               <Plus className="h-10 w-10" />

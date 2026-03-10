@@ -1,8 +1,27 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Trash2, GripVertical } from 'lucide-react';
 import type { TimelineSegment, SourceVideo } from '@/types/video';
+
+function TimelineDropZone({ active, onDrop }: { active: boolean; onDrop: (e: React.DragEvent) => void }) {
+  const [hovering, setHovering] = useState(false);
+  return (
+    <div
+      onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }}
+      onDragEnter={(e) => { e.preventDefault(); setHovering(true); }}
+      onDragLeave={() => setHovering(false)}
+      onDrop={(e) => { setHovering(false); onDrop(e); }}
+      className={`transition-all duration-150 shrink-0 self-stretch rounded ${
+        active
+          ? hovering
+            ? 'w-8 bg-primary/30 border-2 border-dashed border-primary mx-0.5'
+            : 'w-3 mx-0'
+          : 'w-0 mx-0'
+      }`}
+    />
+  );
+}
 
 interface TimelineTrackProps {
   segments: TimelineSegment[];
@@ -13,12 +32,12 @@ interface TimelineTrackProps {
 
 export function TimelineTrack({ segments, sourceVideos, onReorder, onRemove }: TimelineTrackProps) {
   const [thumbnails, setThumbnails] = useState<Record<string, string>>({});
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const dragNodeRef = useRef<HTMLDivElement | null>(null);
 
-  // Cache key includes time range so trimming a segment regenerates its thumbnail
   const thumbnailKey = (segment: TimelineSegment) =>
     `${segment.id}-${segment.startTime}-${segment.endTime}`;
 
-  // Generate thumbnails for each segment (frame from within the cut range)
   useEffect(() => {
     const videoElements: HTMLVideoElement[] = [];
 
@@ -78,27 +97,35 @@ export function TimelineTrack({ segments, sourceVideos, onReorder, onRemove }: T
     };
   }, [segments, sourceVideos]);
 
-  const handleDragStart = (e: React.DragEvent, index: number) => {
+  const handleDragStart = useCallback((e: React.DragEvent, index: number) => {
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', index.toString());
-  };
+    setDragIndex(index);
+    const el = e.currentTarget as HTMLDivElement;
+    dragNodeRef.current = el;
+    requestAnimationFrame(() => { el.style.opacity = '0.35'; });
+  }, []);
 
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-  };
+  const handleDragEnd = useCallback(() => {
+    if (dragNodeRef.current) dragNodeRef.current.style.opacity = '';
+    setDragIndex(null);
+    dragNodeRef.current = null;
+  }, []);
 
-  const handleDrop = (e: React.DragEvent, toIndex: number) => {
+  const handleDropAtIndex = useCallback((toIndex: number) => (e: React.DragEvent) => {
     e.preventDefault();
     const fromIndex = parseInt(e.dataTransfer.getData('text/plain'));
-    if (fromIndex !== toIndex) {
-      onReorder(fromIndex, toIndex);
+    if (Number.isNaN(fromIndex)) return;
+    const adjustedTo = fromIndex < toIndex ? toIndex - 1 : toIndex;
+    if (fromIndex !== adjustedTo) {
+      onReorder(fromIndex, adjustedTo);
     }
-  };
+  }, [onReorder]);
 
+  const isDragging = dragIndex !== null;
   const totalDuration = segments.reduce((sum, seg) => sum + seg.duration, 0);
   const maxSeconds = Math.ceil(totalDuration);
-  const pixelsPerSecond = 100; // Scale factor for visualization
+  const pixelsPerSecond = 100;
 
   if (segments.length === 0) {
     return (
@@ -155,60 +182,66 @@ export function TimelineTrack({ segments, sourceVideos, onReorder, onRemove }: T
 
             {/* Timeline track */}
             <div className="relative bg-muted/30 rounded-lg p-2 min-h-36">
-              <div className="flex gap-1 items-center">
+              <div className="flex items-center">
+            {/* Drop zone before first */}
+            <TimelineDropZone
+              active={isDragging && dragIndex !== 0}
+              onDrop={handleDropAtIndex(0)}
+            />
             {segments.map((segment, index) => {
               const segmentWidth = segment.duration * pixelsPerSecond;
               const thumbnail = thumbnails[thumbnailKey(segment)];
               
               return (
-                <div
-                  key={segment.id}
-                  draggable
-                  onDragStart={(e) => handleDragStart(e, index)}
-                  onDragOver={handleDragOver}
-                  onDrop={(e) => handleDrop(e, index)}
-                  className="relative group cursor-move"
-                  style={{ width: `${segmentWidth}px` }}
-                >
-                  <Card className="h-60 border-2 border-primary/50 hover:border-primary transition-colors overflow-hidden">
-                    <CardContent className="p-0 h-full flex relative">
-                      {/* Thumbnail */}
-                      {thumbnail ? (
-                        <img
-                          src={thumbnail}
-                          alt={segment.videoName}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full bg-gradient-to-r from-primary/20 to-primary/30" />
-                      )}
-                      
-                      {/* Overlay info */}
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex flex-col justify-end p-2">
-                        <p className="text-white text-xs font-medium truncate">
-                          {segment.videoName}
-                        </p>
-                        <p className="text-white/80 text-xs">
-                          {segment.duration.toFixed(2)}s
-                        </p>
-                      </div>
+                <div key={segment.id} className="flex items-center shrink-0">
+                  <div
+                    draggable
+                    onDragStart={(e) => handleDragStart(e, index)}
+                    onDragEnd={handleDragEnd}
+                    className="relative group cursor-grab active:cursor-grabbing transition-transform duration-150"
+                    style={{ width: `${segmentWidth}px` }}
+                  >
+                    <Card className="h-60 border-2 border-primary/50 hover:border-primary transition-colors overflow-hidden">
+                      <CardContent className="p-0 h-full flex relative">
+                        {thumbnail ? (
+                          <img
+                            src={thumbnail}
+                            alt={segment.videoName}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full bg-gradient-to-r from-primary/20 to-primary/30" />
+                        )}
+                        
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex flex-col justify-end p-2">
+                          <p className="text-white text-xs font-medium truncate">
+                            {segment.videoName}
+                          </p>
+                          <p className="text-white/80 text-xs">
+                            {segment.duration.toFixed(2)}s
+                          </p>
+                        </div>
 
-                      {/* Drag handle */}
-                      <div className="absolute top-1 left-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <GripVertical className="h-4 w-4 text-white drop-shadow" />
-                      </div>
+                        <div className="absolute top-1 left-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <GripVertical className="h-4 w-4 text-white drop-shadow" />
+                        </div>
 
-                      {/* Delete button */}
-                      <Button
-                        variant="destructive"
-                        size="icon"
-                        className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                        onClick={() => onRemove(segment.id)}
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    </CardContent>
-                  </Card>
+                        <Button
+                          variant="destructive"
+                          size="icon"
+                          className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={() => onRemove(segment.id)}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  </div>
+                  {/* Drop zone after each segment */}
+                  <TimelineDropZone
+                    active={isDragging && dragIndex !== index && dragIndex !== index + 1}
+                    onDrop={handleDropAtIndex(index + 1)}
+                  />
                 </div>
               );
             })}

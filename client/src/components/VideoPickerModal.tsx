@@ -131,6 +131,10 @@ export function VideoPickerModal({
                 <VideoCard
                   key={video.id}
                   video={video}
+                  onClick={() => {
+                    onSelectVideo(video);
+                    onClose();
+                  }}
                   onQuickAdd={() => {
                     onSelectVideo(video);
                     onClose();
