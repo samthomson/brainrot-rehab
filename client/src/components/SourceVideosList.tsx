@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Plus, Trash2 } from 'lucide-react';
@@ -22,25 +22,6 @@ interface SourceVideosListProps {
   showClearButton: boolean;
 }
 
-function DropZone({ active, onDrop }: { active: boolean; onDrop: (e: React.DragEvent) => void }) {
-  const [hovering, setHovering] = useState(false);
-  return (
-    <div
-      onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }}
-      onDragEnter={(e) => { e.preventDefault(); setHovering(true); }}
-      onDragLeave={() => setHovering(false)}
-      onDrop={(e) => { setHovering(false); onDrop(e); }}
-      className={`transition-all duration-150 rounded-md ${
-        active
-          ? hovering
-            ? 'h-16 bg-primary/20 border-2 border-dashed border-primary my-1'
-            : 'h-4 my-0'
-          : 'h-0 my-0'
-      }`}
-    />
-  );
-}
-
 export function SourceVideosList({
   sourceSegments,
   timelineSegments,
@@ -54,36 +35,79 @@ export function SourceVideosList({
 }: SourceVideosListProps) {
   const [playingSegmentId, setPlayingSegmentId] = useState<string | null>(null);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [hasDragMoved, setHasDragMoved] = useState(false);
   const dragNodeRef = useRef<HTMLDivElement | null>(null);
+  const lastSwapRef = useRef<number>(0);
+  const scrollSpeedRef = useRef<number>(0);
+  const scrollRafRef = useRef<number | null>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  const cardRefsMap = useRef<Map<string, HTMLDivElement>>(new Map());
 
-  const handleDragStart = useCallback((e: React.DragEvent, index: number) => {
+  useEffect(() => {
+    const tick = () => {
+      if (scrollSpeedRef.current !== 0) {
+        window.scrollBy(0, scrollSpeedRef.current);
+      }
+      scrollRafRef.current = requestAnimationFrame(tick);
+    };
+    scrollRafRef.current = requestAnimationFrame(tick);
+    return () => {
+      if (scrollRafRef.current) cancelAnimationFrame(scrollRafRef.current);
+    };
+  }, []);
+
+  const handleDragStart = useCallback((e: React.DragEvent, index: number, segmentId: string) => {
+    const cardEl = cardRefsMap.current.get(segmentId);
+    if (cardEl) {
+      const rect = cardEl.getBoundingClientRect();
+      e.dataTransfer.setDragImage(cardEl, e.clientX - rect.left, e.clientY - rect.top);
+    }
     setDragIndex(index);
+    setHasDragMoved(false);
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', index.toString());
     const el = e.currentTarget as HTMLDivElement;
     dragNodeRef.current = el;
-    requestAnimationFrame(() => {
-      el.style.opacity = '0.35';
-    });
   }, []);
 
   const handleDragEnd = useCallback(() => {
     if (dragNodeRef.current) {
       dragNodeRef.current.style.opacity = '';
+      dragNodeRef.current.style.transform = '';
     }
     setDragIndex(null);
+    setHasDragMoved(false);
     dragNodeRef.current = null;
+    scrollSpeedRef.current = 0;
   }, []);
 
-  const handleDropAtIndex = useCallback((toIndex: number) => (e: React.DragEvent) => {
+  const handleDragOver = useCallback((e: React.DragEvent, index: number) => {
     e.preventDefault();
-    const fromIndex = parseInt(e.dataTransfer.getData('text/plain'));
-    if (Number.isNaN(fromIndex)) return;
-    const adjustedTo = fromIndex < toIndex ? toIndex - 1 : toIndex;
-    if (fromIndex !== adjustedTo) {
-      onReorder(fromIndex, adjustedTo);
+    e.dataTransfer.dropEffect = 'move';
+
+    const edgeZone = 180;
+    const { clientY } = e;
+    const vh = window.innerHeight;
+    if (clientY < edgeZone) {
+      const intensity = 1 - clientY / edgeZone;
+      scrollSpeedRef.current = -(4 + intensity * 16);
+    } else if (clientY > vh - edgeZone) {
+      const intensity = 1 - (vh - clientY) / edgeZone;
+      scrollSpeedRef.current = 4 + intensity * 16;
+    } else {
+      scrollSpeedRef.current = 0;
     }
-  }, [onReorder]);
+
+    if (dragIndex === null || dragIndex === index) return;
+
+    const now = Date.now();
+    if (now - lastSwapRef.current < 200) return;
+    lastSwapRef.current = now;
+
+    onReorder(dragIndex, index);
+    setDragIndex(index);
+    setHasDragMoved(true);
+  }, [dragIndex, onReorder]);
 
   const handlePlayingChange = (segmentId: string, playing: boolean) => {
     if (playing) {
@@ -92,8 +116,6 @@ export function SourceVideosList({
       setPlayingSegmentId(null);
     }
   };
-
-  const isDragging = dragIndex !== null;
 
   if (sourceSegments.length === 0) {
     return (
@@ -130,38 +152,46 @@ export function SourceVideosList({
         )}
       </div>
 
-      <div>
-        {/* Drop zone before first item */}
-        <DropZone active={isDragging && dragIndex !== 0} onDrop={handleDropAtIndex(0)} />
-
-        {sourceSegments.map((segment, index) => (
-          <div key={segment.id}>
-            <div
-              draggable
-              onDragStart={(e) => handleDragStart(e, index)}
-              onDragEnd={handleDragEnd}
-              className="transition-transform duration-150 cursor-grab active:cursor-grabbing py-1.5"
-            >
-              <SourceVideoItem
-                video={segment.video}
-                segmentId={segment.id}
-                index={index}
-                initialStartTime={timelineSegments.find((t) => t.id === segment.id)?.startTime}
-                initialEndTime={timelineSegments.find((t) => t.id === segment.id)?.endTime}
-                onRemove={onRemoveSegment}
-                onDuplicate={onDuplicateVideo}
-                onSegmentChange={onSegmentChange}
-                onPlayingChange={handlePlayingChange}
-                shouldPause={playingSegmentId !== null && playingSegmentId !== segment.id}
-              />
+      <div ref={listRef}>
+        {sourceSegments.map((segment, index) => {
+          const isDragged = dragIndex === index;
+          const showPlaceholder = isDragged && hasDragMoved;
+          return (
+            <div key={segment.id}>
+              <div
+                draggable
+                onDragStart={(e) => handleDragStart(e, index, segment.id)}
+                onDragEnd={handleDragEnd}
+                onDragOver={(e) => handleDragOver(e, index)}
+                className="cursor-grab active:cursor-grabbing py-1.5"
+              >
+                {showPlaceholder && (
+                  <div className="h-[30px] mx-2 mb-2 rounded-lg bg-primary/20 border-2 border-dashed border-primary shadow-[0_0_8px_hsl(var(--primary)/0.4)]" />
+                )}
+                <div
+                  ref={(el) => {
+                    if (el) cardRefsMap.current.set(segment.id, el);
+                    else cardRefsMap.current.delete(segment.id);
+                  }}
+                  className={showPlaceholder ? 'h-0 overflow-hidden' : ''}
+                >
+                  <SourceVideoItem
+                    video={segment.video}
+                    segmentId={segment.id}
+                    index={index}
+                    initialStartTime={timelineSegments.find((t) => t.id === segment.id)?.startTime}
+                    initialEndTime={timelineSegments.find((t) => t.id === segment.id)?.endTime}
+                    onRemove={onRemoveSegment}
+                    onDuplicate={onDuplicateVideo}
+                    onSegmentChange={onSegmentChange}
+                    onPlayingChange={handlePlayingChange}
+                    shouldPause={playingSegmentId !== null && playingSegmentId !== segment.id}
+                  />
+                </div>
+              </div>
             </div>
-            {/* Drop zone after each item */}
-            <DropZone
-              active={isDragging && dragIndex !== index && dragIndex !== index + 1}
-              onDrop={handleDropAtIndex(index + 1)}
-            />
-          </div>
-        ))}
+          );
+        })}
 
         {/* Big + Button at End */}
         <Card className="border-dashed border-2 hover:border-primary/50 transition-colors mt-3">
