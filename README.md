@@ -271,3 +271,13 @@ Compose: `docker-compose.prod.yml`.
 - **Auto-reload:** `tsx watch` in docker-compose detects file changes
 - **Logs:** All output is in container stdout (`docker compose logs -f`)
 - **Temp files:** Videos are processed in temp dirs and cleaned up; final output is only on Blossom
+
+
+## todo
+
+- [ ] progress sections for publishing
+	- [ ] icons are dumb too
+	- [ ] and it jumps back to [20?]% before finishing
+- [ ] some kind of drafts/published ui
+- [ ] zap splits?
+- [ ] support deleting own content
