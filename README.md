@@ -281,3 +281,6 @@ Compose: `docker-compose.prod.yml`.
 - [ ] some kind of drafts/published ui
 - [ ] zap splits?
 - [ ] support deleting own content
+
+- [ ] highlight brainrot in ui for adding videos
+- [ ] neon green favicon
