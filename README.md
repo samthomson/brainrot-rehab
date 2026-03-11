@@ -284,3 +284,4 @@ Compose: `docker-compose.prod.yml`.
 
 - [ ] highlight brainrot in ui for adding videos
 - [ ] neon green favicon
+- [ ] use an existing brainrot as a template
