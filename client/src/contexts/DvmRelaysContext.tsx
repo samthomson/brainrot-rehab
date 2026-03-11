@@ -1,21 +1,21 @@
 import { createContext, useContext, type ReactNode } from 'react';
 
 const DvmRelaysContext = createContext<{
-  enabledRelays: string[];
-  setEnabledRelays: React.Dispatch<React.SetStateAction<string[]>>;
+  userSelectedWriteRelays: string[];
+  setUserSelectedWriteRelays: React.Dispatch<React.SetStateAction<string[]>>;
 } | null>(null);
 
 export function DvmRelaysProvider({
-  enabledRelays,
-  setEnabledRelays,
+  userSelectedWriteRelays,
+  setUserSelectedWriteRelays,
   children,
 }: {
-  enabledRelays: string[];
-  setEnabledRelays: React.Dispatch<React.SetStateAction<string[]>>;
+  userSelectedWriteRelays: string[];
+  setUserSelectedWriteRelays: React.Dispatch<React.SetStateAction<string[]>>;
   children: ReactNode;
 }) {
   return (
-    <DvmRelaysContext.Provider value={{ enabledRelays, setEnabledRelays }}>
+    <DvmRelaysContext.Provider value={{ userSelectedWriteRelays, setUserSelectedWriteRelays }}>
       {children}
     </DvmRelaysContext.Provider>
   );

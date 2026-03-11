@@ -11,31 +11,30 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Radio, ChevronDown } from 'lucide-react';
 import { useToast } from '@/hooks/useToast';
 import { usePersistedState } from '@/hooks/usePersistedState';
-import { ALL_DVM_RELAY_PRESETS } from '@/lib/dvmRelays';
+import { WRITE_RELAYS_OPTIONS } from '@/lib/dvmRelays';
 
 interface RelaySelectorProps {
-  /** All enabled DVM relays (user can toggle any on/off). */
-  enabledRelays: string[];
-  onEnabledRelaysChange: (urls: string[]) => void;
+  userSelectedWriteRelays: string[];
+  onUserSelectedWriteRelaysChange: (urls: string[]) => void;
 }
 
 function stripScheme(url: string): string {
   return url.replace(/^wss:\/\//, '').replace(/^ws:\/\//, '');
 }
 
-export function RelaySelector({ enabledRelays, onEnabledRelaysChange }: RelaySelectorProps) {
+export function RelaySelector({ userSelectedWriteRelays, onUserSelectedWriteRelaysChange }: RelaySelectorProps) {
   const [customInput, setCustomInput] = useState('');
   const [open, setOpen] = useState(false);
   const { toast } = useToast();
-  const [customRelayUrls, setCustomRelayUrls] = usePersistedState<string[]>('dvm-custom-relays', []);
+  const [customRelayUrls, setCustomRelayUrls] = usePersistedState<string[]>('write-relays-custom', []);
 
-  const allRelayOptions = [...ALL_DVM_RELAY_PRESETS, ...customRelayUrls];
+  const allRelayOptions = [...WRITE_RELAYS_OPTIONS, ...customRelayUrls];
 
   const toggleRelay = (url: string, enabled: boolean) => {
     if (enabled) {
-      onEnabledRelaysChange([...enabledRelays, url]);
+      onUserSelectedWriteRelaysChange([...userSelectedWriteRelays, url]);
     } else {
-      onEnabledRelaysChange(enabledRelays.filter((u) => u !== url));
+      onUserSelectedWriteRelaysChange(userSelectedWriteRelays.filter((u) => u !== url));
     }
   };
 
@@ -52,19 +51,19 @@ export function RelaySelector({ enabledRelays, onEnabledRelaysChange }: RelaySel
     if (!customRelayUrls.includes(url)) {
       setCustomRelayUrls((prev) => [...prev, url]);
     }
-    if (!enabledRelays.includes(url)) {
-      onEnabledRelaysChange([...enabledRelays, url]);
+    if (!userSelectedWriteRelays.includes(url)) {
+      onUserSelectedWriteRelaysChange([...userSelectedWriteRelays, url]);
     }
     setCustomInput('');
     setOpen(false);
     toast({ title: 'Relay added', description: stripScheme(url) });
   };
 
-  const displayLabel = enabledRelays.length === 0
+  const displayLabel = userSelectedWriteRelays.length === 0
     ? 'No relays'
-    : enabledRelays.length === 1
-      ? stripScheme(enabledRelays[0])
-      : `${enabledRelays.length} relays`;
+    : userSelectedWriteRelays.length === 1
+      ? stripScheme(userSelectedWriteRelays[0])
+      : `${userSelectedWriteRelays.length} relays`;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -78,9 +77,9 @@ export function RelaySelector({ enabledRelays, onEnabledRelaysChange }: RelaySel
       <PopoverContent className="w-80" align="end">
         <div className="space-y-4">
           <div>
-            <h4 className="font-semibold mb-2">DVM relay pool</h4>
+            <h4 className="font-semibold mb-2">Publish video to</h4>
             <p className="text-xs text-muted-foreground mb-3">
-              Toggle relays on or off. At least one must be enabled.
+              Toggle relays. At least one required.
             </p>
           </div>
 
@@ -90,7 +89,7 @@ export function RelaySelector({ enabledRelays, onEnabledRelaysChange }: RelaySel
               <div key={url} className="flex items-center gap-2">
                 <Checkbox
                   id={`relay-${url}`}
-                  checked={enabledRelays.includes(url)}
+                  checked={userSelectedWriteRelays.includes(url)}
                   onCheckedChange={(checked) => toggleRelay(url, checked === true)}
                 />
                 <label htmlFor={`relay-${url}`} className="text-sm cursor-pointer flex-1 truncate">

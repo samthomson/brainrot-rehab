@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/useToast';
 import { usePersistedState } from '@/hooks/usePersistedState';
-import { ALL_DVM_RELAY_PRESETS, DEFAULT_BLOSSOM_UPLOAD_URL } from '@/lib/dvmRelays';
+import { DEFAULT_BLOSSOM_UPLOAD_URL, WRITE_RELAYS_OPTIONS } from '@/lib/dvmRelays';
 
 interface SettingsModalProps {
   open: boolean;
@@ -20,8 +20,8 @@ interface SettingsModalProps {
   onDvmPubkeyChange: (pubkey: string) => void;
   blossomUploadUrl: string;
   onBlossomUrlChange: (url: string) => void;
-  enabledRelays: string[];
-  onEnabledRelaysChange: (urls: string[]) => void;
+  userSelectedWriteRelays: string[];
+  onUserSelectedWriteRelaysChange: (urls: string[]) => void;
 }
 
 function stripScheme(url: string): string {
@@ -35,20 +35,20 @@ export function SettingsModal({
   onDvmPubkeyChange,
   blossomUploadUrl,
   onBlossomUrlChange,
-  enabledRelays,
-  onEnabledRelaysChange,
+  userSelectedWriteRelays,
+  onUserSelectedWriteRelaysChange,
 }: SettingsModalProps) {
   const { toast } = useToast();
   const [customInput, setCustomInput] = useState('');
-  const [customRelayUrls, setCustomRelayUrls] = usePersistedState<string[]>('dvm-custom-relays', []);
+  const [customRelayUrls, setCustomRelayUrls] = usePersistedState<string[]>('write-relays-custom', []);
 
-  const allRelayOptions = [...ALL_DVM_RELAY_PRESETS, ...customRelayUrls];
+  const allRelayOptions = [...WRITE_RELAYS_OPTIONS, ...customRelayUrls];
 
   const toggleRelay = (url: string, enabled: boolean) => {
     if (enabled) {
-      onEnabledRelaysChange([...enabledRelays, url]);
+      onUserSelectedWriteRelaysChange([...userSelectedWriteRelays, url]);
     } else {
-      onEnabledRelaysChange(enabledRelays.filter((u) => u !== url));
+      onUserSelectedWriteRelaysChange(userSelectedWriteRelays.filter((u) => u !== url));
     }
   };
 
@@ -65,8 +65,8 @@ export function SettingsModal({
     if (!customRelayUrls.includes(url)) {
       setCustomRelayUrls((prev) => [...prev, url]);
     }
-    if (!enabledRelays.includes(url)) {
-      onEnabledRelaysChange([...enabledRelays, url]);
+    if (!userSelectedWriteRelays.includes(url)) {
+      onUserSelectedWriteRelaysChange([...userSelectedWriteRelays, url]);
     }
     setCustomInput('');
     toast({ title: 'Relay added', description: stripScheme(url) });
@@ -81,10 +81,10 @@ export function SettingsModal({
       });
       return;
     }
-    if (enabledRelays.length === 0) {
+    if (userSelectedWriteRelays.length === 0) {
       toast({
         title: 'At least one relay required',
-        description: 'Enable at least one DVM relay to send jobs.',
+        description: 'Select at least one relay to publish your video to.',
         variant: 'destructive',
       });
       return;
@@ -127,9 +127,9 @@ export function SettingsModal({
           </div>
 
           <div className="space-y-4 pt-4 border-t">
-            <h4 className="font-semibold">DVM Relay Pool</h4>
+            <h4 className="font-semibold">Publish video to</h4>
             <p className="text-xs text-muted-foreground">
-              Choose which relays to use for DVM jobs. At least one must be enabled. You can turn off the default and use only a custom relay.
+              Relays where your finished video will be published. At least one required.
             </p>
             <div className="space-y-2">
               <Label className="text-xs">Relays</Label>
@@ -137,7 +137,7 @@ export function SettingsModal({
                 <div key={url} className="flex items-center gap-2">
                   <Checkbox
                     id={url}
-                    checked={enabledRelays.includes(url)}
+                    checked={userSelectedWriteRelays.includes(url)}
                     onCheckedChange={(checked) => toggleRelay(url, checked === true)}
                   />
                   <label htmlFor={url} className="text-sm cursor-pointer flex-1 truncate">

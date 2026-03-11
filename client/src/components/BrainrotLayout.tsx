@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import { Link, useLocation } from 'react-router-dom';
 import { BrainrotLogo } from '@/components/BrainrotLogo';
@@ -6,7 +6,7 @@ import { LoginArea } from '@/components/auth/LoginArea';
 import { SettingsModal } from '@/components/SettingsModal';
 import { DvmRelaysProvider } from '@/contexts/DvmRelaysContext';
 import { usePersistedState } from '@/hooks/usePersistedState';
-import { BRAINROT_RELAY_URL, DEFAULT_BLOSSOM_UPLOAD_URL, DEFAULT_DVM_PUBKEY, DEFAULT_DVM_RELAYS } from '@/lib/dvmRelays';
+import { DEFAULT_BLOSSOM_UPLOAD_URL, DEFAULT_DVM_PUBKEY, DVM_RELAYS } from '@/lib/dvmRelays';
 
 const navItems = [
   { path: '/rot', label: 'Rot' },
@@ -19,24 +19,13 @@ export function BrainrotLayout() {
 
   const [dvmPubkey, setDvmPubkey] = usePersistedState<string>('video-remix-dvm-pubkey', DEFAULT_DVM_PUBKEY);
   const [blossomUploadUrl, setBlossomUploadUrl] = usePersistedState<string>('video-remix-blossom-url', DEFAULT_BLOSSOM_UPLOAD_URL);
-  const [enabledRelays, setEnabledRelays] = usePersistedState<string[]>('dvm-enabled-relays', DEFAULT_DVM_RELAYS);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    if (window.localStorage.getItem('dvm-enabled-relays') !== null) return;
-    try {
-      const raw = window.localStorage.getItem('video-remix-additional-relays');
-      if (raw) {
-        const additional = JSON.parse(raw) as string[];
-        setEnabledRelays([BRAINROT_RELAY_URL, ...additional]);
-      }
-    } catch {
-      // ignore
-    }
-  }, [setEnabledRelays]);
+  const [userSelectedWriteRelays, setUserSelectedWriteRelays] = usePersistedState<string[]>(
+    'user-selected-write-relays',
+    [DVM_RELAYS[0]]
+  );
 
   return (
-    <DvmRelaysProvider enabledRelays={enabledRelays} setEnabledRelays={setEnabledRelays}>
+    <DvmRelaysProvider userSelectedWriteRelays={userSelectedWriteRelays} setUserSelectedWriteRelays={setUserSelectedWriteRelays}>
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur-xl">
         <div className="max-w-6xl mx-auto px-6 py-4">
@@ -84,8 +73,8 @@ export function BrainrotLayout() {
         onDvmPubkeyChange={setDvmPubkey}
         blossomUploadUrl={blossomUploadUrl}
         onBlossomUrlChange={setBlossomUploadUrl}
-        enabledRelays={enabledRelays}
-        onEnabledRelaysChange={setEnabledRelays}
+        userSelectedWriteRelays={userSelectedWriteRelays}
+        onUserSelectedWriteRelaysChange={setUserSelectedWriteRelays}
       />
     </div>
     </DvmRelaysProvider>

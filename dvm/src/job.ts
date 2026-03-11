@@ -281,7 +281,8 @@ export async function runJob(
   }
 
   // --- Step 5: Publish video event + success ---
-  const publishResults = await Promise.allSettled(pool.publish(relays, signedEv))
+  const videoPublishRelays = [...new Set([...relays, ...(payload.write_relays || [])])]
+  const publishResults = await Promise.allSettled(pool.publish(videoPublishRelays, signedEv))
   const rejected = publishResults.filter(r => r.status === 'rejected')
   if (rejected.length > 0) {
     log.warn('Some relays rejected video event', { jobId, rejected: rejected.map(r => String((r as PromiseRejectedResult).reason)) })

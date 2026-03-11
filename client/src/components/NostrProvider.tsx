@@ -3,15 +3,7 @@ import { NostrEvent, NostrFilter, NPool, NRelay1 } from '@nostrify/nostrify';
 import { NostrContext } from '@nostrify/react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAppContext } from '@/hooks/useAppContext';
-import { DEFAULT_DVM_RELAYS } from '@/lib/dvmRelays';
-
-function getDvmRelays(): string[] {
-  try {
-    const raw = localStorage.getItem('dvm-enabled-relays');
-    if (raw) return JSON.parse(raw) as string[];
-  } catch { /* ignore */ }
-  return DEFAULT_DVM_RELAYS;
-}
+import { DVM_RELAYS, DISCOVERY_RELAYS } from '@/lib/dvmRelays';
 
 interface NostrProviderProps {
   children: React.ReactNode;
@@ -50,26 +42,22 @@ const NostrProvider: React.FC<NostrProviderProps> = (props) => {
         const isDvmJobQuery = filters.some(f => f.kinds?.includes(30534));
 
         if (isVideoQuery) {
-          // Video browsing: query user's personal relays + divine
-          const readRelays = relayMetadata.current.relays
-            .filter(r => r.read)
-            .map(r => r.url);
-          for (const url of readRelays) {
+          // Video discovery (add-video modal, etc.): discovery relays + DVM write relay(s)
+          for (const url of DISCOVERY_RELAYS) {
             routes.set(url, filters);
           }
-          routes.set('wss://relay.divine.video', filters);
-
-          // Also include DVM relay for user's own videos (where DVM publishes)
-          for (const relay of getDvmRelays()) {
+          for (const relay of DVM_RELAYS) {
             routes.set(relay, filters);
           }
         } else if (isDvmJobQuery) {
-          // DVM job status: only query DVM relays
-          for (const relay of getDvmRelays()) {
+          for (const relay of DVM_RELAYS) {
             routes.set(relay, filters);
           }
         } else {
-          // Other queries: use user's personal relays
+          // Profiles, contact list, etc.: discovery relays + user's personal relays
+          for (const url of DISCOVERY_RELAYS) {
+            routes.set(url, filters);
+          }
           const readRelays = relayMetadata.current.relays
             .filter(r => r.read)
             .map(r => r.url);

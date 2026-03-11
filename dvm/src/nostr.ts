@@ -76,7 +76,7 @@ export type ResolvedClip = {
 }
 
 /** Parse job request content (kind 5342). Supports both old (with originalEvent) and new (with videoUrl) formats. */
-export function parseJobRequest(content: string): { clips: ResolvedClip[]; blossom_upload_url: string; caption?: string } {
+export function parseJobRequest(content: string): { clips: ResolvedClip[]; blossom_upload_url: string; caption?: string; write_relays?: string[] } {
   const raw = JSON.parse(content) as import('./types.js').JobRequestPayload
   if (!raw.segments?.length) throw new Error('Job request must have "segments"')
   if (!raw.blossom_upload_url) throw new Error('Job request must have "blossom_upload_url"')
@@ -112,7 +112,8 @@ export function parseJobRequest(content: string): { clips: ResolvedClip[]; bloss
     
     throw new Error(`Segment missing video URL`)
   }
-  return { clips, blossom_upload_url: raw.blossom_upload_url, caption: raw.caption }
+  const write_relays = Array.isArray(raw.write_relays) ? raw.write_relays.filter((u): u is string => typeof u === 'string' && (u.startsWith('wss://') || u.startsWith('ws://'))) : undefined
+  return { clips, blossom_upload_url: raw.blossom_upload_url, caption: raw.caption, write_relays }
 }
 
 /** Extract video URL from kind 22/34236 event tags (imeta tag: "url https://...") */

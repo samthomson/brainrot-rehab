@@ -1,26 +1,41 @@
-/** Single source of truth: DVM relay for brainrot.rehab. */
-export const BRAINROT_RELAY_URL = 'wss://relay.brainrot.rehab';
+const _env = import.meta.env;
 
-/** Default DVM relay list (user can toggle any on/off in Settings). */
-export const DEFAULT_DVM_RELAYS = [BRAINROT_RELAY_URL];
-
-/** Default Blossom server URL for DVM video uploads. */
-export const DEFAULT_BLOSSOM_UPLOAD_URL = 'https://blossom.brainrot.rehab';
-
-/** DVM public key (64 hex). Set via VITE_DVM_PUBKEY at build time; user can override in Settings. */
-export const DEFAULT_DVM_PUBKEY = (import.meta.env.VITE_DVM_PUBKEY as string | undefined)?.trim() ?? '';
-
-/** Client tag for brainrot.rehab videos (filter feeds by this). */
-export const BRAINROT_CLIENT_TAG = 'brainrot.rehab';
-
-/** Optional relays users can add to the DVM pool (presets in selector). */
-export const OPTIONAL_RELAY_PRESETS = [
+/** Relays used for discovery: profiles (kind 0), video listing (add-video modal). Also the options for "where to publish your video" in Settings. */
+export const DISCOVERY_RELAYS = [
+  'wss://relay.divine.video',
   'wss://relay.damus.io',
   'wss://relay.ditto.pub',
   'wss://relay.primal.net',
-  'wss://nos.lol',
   'wss://relay.nostr.band',
-] as const;
+];
 
-/** All preset relay options for DVM (brainrot first, then optional). Used for Settings UI. */
-export const ALL_DVM_RELAY_PRESETS = [BRAINROT_RELAY_URL, ...OPTIONAL_RELAY_PRESETS];
+/** DVM relay(s). From RELAYS env (injected as VITE_RELAYS by vite.config). Required. */
+function parseRelays(): string[] {
+  const raw = (_env.VITE_RELAYS as string | undefined)?.trim();
+  if (!raw) throw new Error('RELAYS env is required (set in .env; client reads it as VITE_RELAYS)');
+  const list = raw.split(',').map((s) => s.trim()).filter(Boolean);
+  if (list.length === 0) throw new Error('RELAYS env must contain at least one relay URL');
+  return list;
+}
+
+export const DVM_RELAYS = parseRelays();
+
+/** @deprecated Use DVM_RELAYS. Kept for compatibility. */
+export const DEFAULT_DVM_RELAYS = DVM_RELAYS;
+
+/** Relay options for "where to publish your video" in Settings. DVM relay + discovery relays. */
+export const WRITE_RELAYS_OPTIONS = [...new Set([...DVM_RELAYS, ...DISCOVERY_RELAYS])];
+
+/** Blossom upload URL. From VITE_BLOSSOM_UPLOAD_URL. Required. */
+function parseBlossomUrl(): string {
+  const raw = (_env.VITE_BLOSSOM_UPLOAD_URL as string | undefined)?.trim();
+  if (!raw) throw new Error('VITE_BLOSSOM_UPLOAD_URL env is required');
+  return raw;
+}
+
+export const DEFAULT_BLOSSOM_UPLOAD_URL = parseBlossomUrl();
+
+/** DVM public key (64 hex). From VITE_DVM_PUBKEY. */
+export const DEFAULT_DVM_PUBKEY = (_env.VITE_DVM_PUBKEY as string | undefined)?.trim() ?? '';
+
+export const BRAINROT_CLIENT_TAG = 'brainrot.rehab';

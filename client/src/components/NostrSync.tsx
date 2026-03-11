@@ -2,7 +2,6 @@ import { useEffect } from 'react';
 import { useNostr } from '@nostrify/react';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { useAppContext } from '@/hooks/useAppContext';
-import { DEFAULT_DVM_RELAYS } from '@/lib/dvmRelays';
 
 /**
  * NostrSync - Syncs user's Nostr data
