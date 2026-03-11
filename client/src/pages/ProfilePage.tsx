@@ -146,7 +146,7 @@ export default function ProfilePage() {
         <div className="mt-8">
           <h2 className="text-xl font-semibold mb-4">Videos</h2>
           {videosLoading ? (
-            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
               {[...Array(12)].map((_, i) => (
                 <Skeleton key={i} className="aspect-[9/16] rounded-lg" />
               ))}
@@ -161,7 +161,7 @@ export default function ProfilePage() {
               )}
             </p>
           ) : (
-            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
               {videos.map((video) => (
                 <VideoCard
                   key={video.id}
