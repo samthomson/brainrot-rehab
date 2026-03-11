@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, memo } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Play, Pause, Plus, Copy, Ban } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -9,14 +9,18 @@ import type { Video } from '@/types/video';
 
 interface VideoCardProps {
   video: Video;
+  /** Pass pre-fetched author name to avoid per-card relay queries */
+  authorName?: string;
   onQuickAdd?: () => void;
   showQuickAdd?: boolean;
   onBlockUser?: (pubkey: string) => void;
   onClick?: () => void;
 }
 
-export function VideoCard({ video, onQuickAdd, showQuickAdd = false, onBlockUser, onClick }: VideoCardProps) {
-  const { displayName } = useVideoAuthor(video);
+export const VideoCard = memo(function VideoCard({ video, authorName, onQuickAdd, showQuickAdd = false, onBlockUser, onClick }: VideoCardProps) {
+  const skipAuthorQuery = !!authorName;
+  const fallback = useVideoAuthor(skipAuthorQuery ? undefined : video);
+  const displayName = authorName || fallback.displayName;
   const [generatedThumbnail, setGeneratedThumbnail] = useState<string | null>(null);
   const [showInlinePlayer, setShowInlinePlayer] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -240,4 +244,4 @@ export function VideoCard({ video, onQuickAdd, showQuickAdd = false, onBlockUser
       </CardContent>
     </Card>
   );
-}
+});

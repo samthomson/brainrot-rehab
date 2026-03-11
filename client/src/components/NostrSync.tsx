@@ -39,16 +39,27 @@ export function NostrSync() {
                 write: !marker || marker === 'write',
               }));
 
-            // Always include brainrot.rehab relay - videos are published there
-            const brainrotEntry = {
-              url: BRAINROT_RELAY_URL,
-              read: true,
-              write: true,
-            };
-            const mergedRelays =
-              fetchedRelays.some((r) => r.url === BRAINROT_RELAY_URL)
-                ? fetchedRelays
-                : [brainrotEntry, ...fetchedRelays];
+            // Always include essential video relays
+            const essentialRelays = [
+              {
+                url: BRAINROT_RELAY_URL,
+                read: true,
+                write: true,
+              },
+              {
+                url: 'wss://relay.divine.video',
+                read: true,
+                write: true,
+              },
+            ];
+
+            // Merge essential relays with user's relay list
+            const mergedRelays = [...essentialRelays];
+            for (const relay of fetchedRelays) {
+              if (!mergedRelays.some((r) => r.url === relay.url)) {
+                mergedRelays.push(relay);
+              }
+            }
 
             if (mergedRelays.length > 0) {
               console.log('Syncing relay list from Nostr:', mergedRelays);

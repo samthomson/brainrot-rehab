@@ -46,13 +46,22 @@ function parseVideoEvent(event: NostrEvent): Video | null {
   }
 }
 
-export function useShortFormVideos(searchTerm?: string, authorPubkey?: string) {
+export function useShortFormVideos(
+  searchTerm?: string,
+  authorPubkey?: string | null,
+  authorPubkeys?: string[] | null
+) {
   const { nostr } = useNostr();
 
+  const authors = authorPubkey
+    ? [authorPubkey]
+    : authorPubkeys?.length
+      ? authorPubkeys
+      : undefined;
+
   return useQuery({
-    queryKey: ['short-form-videos', searchTerm, authorPubkey],
+    queryKey: ['short-form-videos', searchTerm, authors ?? null],
     queryFn: async () => {
-      // Query for short-form video events (kind 22, 34236, and 34326 — relay may use 34326)
       const filters: Array<{
         kinds: number[];
         limit: number;
@@ -61,12 +70,12 @@ export function useShortFormVideos(searchTerm?: string, authorPubkey?: string) {
       }> = [
         {
           kinds: [22, 34236, 34326],
-          limit: 200,
+          limit: 500,
         },
       ];
 
-      if (authorPubkey) {
-        filters[0].authors = [authorPubkey];
+      if (authors?.length) {
+        filters[0].authors = authors;
       }
       if (searchTerm && searchTerm.trim()) {
         filters[0].search = searchTerm.trim();

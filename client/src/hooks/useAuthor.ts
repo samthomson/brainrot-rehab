@@ -3,7 +3,7 @@ import { type NostrEvent, type NostrMetadata, NSchema as n } from '@nostrify/nos
 import { useNostr } from '@nostrify/react';
 import { useQuery } from '@tanstack/react-query';
 
-/** Fetch kind 0 metadata for many pubkeys in one query. Returns pubkey -> display name (name || display_name || truncated pubkey). */
+/** Fetch kind 0 metadata for many pubkeys in one query. Returns pubkey -> metadata object. */
 export function useBulkAuthorMetadata(pubkeys: string[]) {
   const { nostr } = useNostr();
   const stableKey = useMemo(() => [...pubkeys].sort().join(','), [pubkeys]);
@@ -11,22 +11,18 @@ export function useBulkAuthorMetadata(pubkeys: string[]) {
   return useQuery({
     queryKey: ['bulk-author-metadata', stableKey],
     queryFn: async ({ signal }) => {
-      if (pubkeys.length === 0) return {} as Record<string, string>;
+      if (pubkeys.length === 0) return {} as Record<string, NostrMetadata>;
       const events = await nostr.query(
         [{ kinds: [0], authors: pubkeys }],
         { signal: AbortSignal.any([signal, AbortSignal.timeout(10_000)]) }
       );
-      const map: Record<string, string> = {};
-      for (const pubkey of pubkeys) {
-        map[pubkey] = `${pubkey.slice(0, 8)}…`;
-      }
+      const map: Record<string, NostrMetadata> = {};
       for (const event of events) {
         try {
           const metadata = n.json().pipe(n.metadata()).parse(event.content);
-          const name = metadata?.name || metadata?.display_name;
-          if (name) map[event.pubkey] = name;
+          if (metadata) map[event.pubkey] = metadata;
         } catch {
-          // keep fallback
+          // skip invalid metadata
         }
       }
       return map;

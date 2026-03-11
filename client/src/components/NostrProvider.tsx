@@ -45,16 +45,22 @@ const NostrProvider: React.FC<NostrProviderProps> = (props) => {
           routes.set(url, filters);
         }
 
-        // 34236 = video events, 30534 = DVM job/task events (Rehab polls for job status)
-        const needsBrainrot = filters.some(
-          f => f.kinds?.includes(34236) || f.kinds?.includes(30534)
+        // Always include essential video relays for video queries
+        const needsVideoRelays = filters.some(
+          f => f.kinds?.includes(22) || f.kinds?.includes(34236) || f.kinds?.includes(34326) || f.kinds?.includes(30534)
         );
-        if (needsBrainrot && !routes.has(BRAINROT_RELAY_URL)) {
-          routes.set(BRAINROT_RELAY_URL, filters);
-        }
-
-        if (needsBrainrot) {
-          console.log('[brainrot-debug] Relays for brainrot kinds:', [...routes.keys()]);
+        
+        if (needsVideoRelays) {
+          const essentialVideoRelays = [
+            BRAINROT_RELAY_URL,
+            'wss://relay.divine.video',
+          ];
+          
+          for (const relay of essentialVideoRelays) {
+            if (!routes.has(relay)) {
+              routes.set(relay, filters);
+            }
+          }
         }
 
         return routes;

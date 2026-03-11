@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -22,13 +22,33 @@ import {
   CommandItem,
   CommandList,
 } from '@/components/ui/command';
-import { Search, Loader2, Settings, Check, ChevronsUpDown } from 'lucide-react';
+import { Loader2, Settings, Check, ChevronsUpDown } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useShortFormVideos } from '@/hooks/useShortFormVideos';
 import { useContactList } from '@/hooks/useFollow';
 import { useBulkAuthorMetadata } from '@/hooks/useAuthor';
 import { VideoCard } from '@/components/VideoCard';
 import { nip19 } from 'nostr-tools';
 import type { Video } from '@/types/video';
+
+const PAGE_SIZE = 40;
+
+/** Returns hex pubkey or null. Tries input as-is, then npub1+input. */
+function tryDecodeNpub(s: string): string | null {
+  const v = s.trim();
+  if (!v) return null;
+  const toTry = /^n(pub|profile)1/i.test(v) ? [v] : [v, `npub1${v}`];
+  for (const candidate of toTry) {
+    try {
+      const decoded = nip19.decode(candidate);
+      if (decoded.type === 'npub') return decoded.data;
+      if (decoded.type === 'nprofile') return decoded.data.pubkey;
+    } catch {
+      continue;
+    }
+  }
+  return null;
+}
 
 interface VideoPickerModalProps {
   open: boolean;
@@ -47,21 +67,11 @@ export function VideoPickerModal({
   onAddToBlocklist,
   onOpenBlocklistManager,
 }: VideoPickerModalProps) {
-  const [searchInput, setSearchInput] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
   const [authorPubkey, setAuthorPubkey] = useState<string | null>(null);
   const [authorInputValue, setAuthorInputValue] = useState('');
   const [authorPopoverOpen, setAuthorPopoverOpen] = useState(false);
-  const searchTimeoutRef = useRef<NodeJS.Timeout>();
-
-  const trimmed = searchInput.trim();
-  const effectiveSearch = trimmed;
-
-  const effectiveAuthor = authorPubkey;
-  const { data: allVideos = [], isLoading } = useShortFormVideos(
-    searchQuery || undefined,
-    effectiveAuthor || undefined
-  );
+  const [followOnly, setFollowOnly] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
   const { data: contactList } = useContactList();
   const followedPubkeys = useMemo(() => {
@@ -71,51 +81,70 @@ export function VideoPickerModal({
       .map(([, pubkey]) => pubkey);
   }, [contactList?.tags]);
 
-  const { data: authorDisplayNames = {} } = useBulkAuthorMetadata(followedPubkeys);
+  const { data: authorMetadata = {} } = useBulkAuthorMetadata(followedPubkeys);
 
-  const videos = allVideos.filter((v) => !blocklist.includes(v.pubkey));
+  const effectiveAuthor = authorPubkey;
+  const effectiveAuthorPubkeys =
+    effectiveAuthor ? undefined : (followOnly && followedPubkeys.length ? followedPubkeys : undefined);
 
+  const { data: allVideos = [], isLoading } = useShortFormVideos(
+    undefined,
+    effectiveAuthor || undefined,
+    effectiveAuthorPubkeys
+  );
+
+  // When user explicitly filters by npub, show that author's videos even if blocked
+  const videos = useMemo(
+    () => allVideos.filter(
+      (v) => !blocklist.includes(v.pubkey) || v.pubkey === effectiveAuthor
+    ),
+    [allVideos, blocklist, effectiveAuthor]
+  );
+
+  const visibleVideos = useMemo(
+    () => videos.slice(0, visibleCount),
+    [videos, visibleCount]
+  );
+
+  const hasMore = visibleCount < videos.length;
+
+  // Batch-fetch author metadata for all visible videos
+  const visiblePubkeys = useMemo(
+    () => [...new Set(visibleVideos.map((v) => v.pubkey))],
+    [visibleVideos]
+  );
+  const { data: videoAuthorMetadata = {} } = useBulkAuthorMetadata(visiblePubkeys);
+
+  // Reset visible count when filters change
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [effectiveAuthor, effectiveAuthorPubkeys, followOnly]);
 
   useEffect(() => {
     if (!open) {
-      setSearchInput('');
-      setSearchQuery('');
       setAuthorPubkey(null);
       setAuthorInputValue('');
+      setVisibleCount(PAGE_SIZE);
     }
   }, [open]);
 
+  const handleShowMore = useCallback(() => {
+    setVisibleCount((prev) => prev + PAGE_SIZE);
+  }, []);
+
+  // Decode npub when user types/pastes in the input (works for anyone, not just followed)
   useEffect(() => {
     const v = authorInputValue.trim();
     if (!v) {
       setAuthorPubkey(null);
       return;
     }
-    const isNpubLike = /^n(pub|profile)1[a-z0-9]+$/i.test(v);
-    if (isNpubLike) {
-      try {
-        const decoded = nip19.decode(v);
-        if (decoded.type === 'npub') {
-          setAuthorPubkey(decoded.data);
-          return;
-        }
-        if (decoded.type === 'nprofile') {
-          setAuthorPubkey(decoded.data.pubkey);
-          return;
-        }
-      } catch {
-        // leave author unchanged on decode error
-      }
+    const pub = tryDecodeNpub(v);
+    if (pub) {
+      setAuthorPubkey(pub);
+      setAuthorPopoverOpen(false);
     }
   }, [authorInputValue]);
-
-  useEffect(() => {
-    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
-    searchTimeoutRef.current = setTimeout(() => setSearchQuery(effectiveSearch), 500);
-    return () => {
-      if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
-    };
-  }, [effectiveSearch]);
 
 
 
@@ -130,7 +159,7 @@ export function VideoPickerModal({
                 {videos.length} videos available
                 {blocklist.length > 0 && (
                   <span className="ml-2">
-                    ({blocklist.length} user{blocklist.length !== 1 ? 's' : ''} blocked)
+                    ({blocklist.length} user{blocklist.length !== 1 ? 's' : ''} excluded)
                   </span>
                 )}
               </p>
@@ -141,79 +170,87 @@ export function VideoPickerModal({
               onClick={onOpenBlocklistManager}
             >
               <Settings className="h-4 w-4 mr-2" />
-              Blocklist
+              Exclude List
             </Button>
           </div>
-          <div className="flex flex-col sm:flex-row gap-3 mt-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search videos…"
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-                className="pl-10 h-12"
-              />
-              {isLoading && (
-                <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
-              )}
-            </div>
-            <Popover open={authorPopoverOpen} onOpenChange={setAuthorPopoverOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  role="combobox"
-                  aria-expanded={authorPopoverOpen}
-                  className="w-full sm:w-[280px] h-12 justify-between font-normal"
-                >
-                  <span className="truncate">
-                    {authorInputValue || 'From people I follow or paste npub…'}
-                  </span>
-                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
-                <Command
-                  shouldFilter={true}
+          <div className="flex flex-col gap-3 mt-4">
+            <div className="flex items-center gap-2">
+              <div className="flex flex-1 min-w-0 rounded-lg border bg-background">
+                <Input
+                  placeholder="Paste npub (npub1…) or pick from list"
                   value={authorInputValue}
-                  onValueChange={(v) => setAuthorInputValue(v)}
-                >
-                  <CommandInput placeholder="Type name or paste npub…" />
-                  <CommandList>
-                    <CommandEmpty>No one found. Paste an npub to filter by that user.</CommandEmpty>
-                    <CommandGroup>
-                      <CommandItem
-                        value="All videos"
-                        onSelect={() => {
-                          setAuthorPubkey(null);
-                          setAuthorInputValue('');
-                          setAuthorPopoverOpen(false);
-                        }}
-                      >
-                        <Check className={!authorPubkey ? 'mr-2 h-4 w-4 opacity-100' : 'mr-2 h-4 w-4 opacity-0'} />
-                        All videos
-                      </CommandItem>
-                      {followedPubkeys.map((pubkey) => {
-                        const label = authorDisplayNames[pubkey] ?? `${pubkey.slice(0, 8)}…`;
-                        return (
+                  onChange={(e) => setAuthorInputValue(e.target.value)}
+                  className="h-14 flex-1 min-w-0 border-0 bg-transparent text-base font-mono placeholder:font-sans focus-visible:ring-0 focus-visible:ring-offset-0"
+                />
+                <Popover open={authorPopoverOpen} onOpenChange={setAuthorPopoverOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-14 w-14 shrink-0 rounded-l-none"
+                      aria-label="Pick from list"
+                    >
+                      <ChevronsUpDown className="h-5 w-5" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-80 p-0" align="end">
+                    <Command shouldFilter={true}>
+                      <CommandInput placeholder="Search people you follow…" />
+                      <CommandList>
+                        <CommandEmpty>
+                          No matches. Paste an npub in the main input to search anyone.
+                        </CommandEmpty>
+                        <CommandGroup>
                           <CommandItem
-                            key={pubkey}
-                            value={label}
+                            value="All videos"
                             onSelect={() => {
-                              setAuthorPubkey(pubkey);
-                              setAuthorInputValue(label);
+                              setAuthorPubkey(null);
+                              setAuthorInputValue('');
                               setAuthorPopoverOpen(false);
                             }}
                           >
-                            <Check className={authorPubkey === pubkey ? 'mr-2 h-4 w-4 opacity-100' : 'mr-2 h-4 w-4 opacity-0'} />
-                            {label}
+                            <Check className={!authorPubkey ? 'mr-2 h-4 w-4 opacity-100' : 'mr-2 h-4 w-4 opacity-0'} />
+                            All videos
                           </CommandItem>
-                        );
-                      })}
-                    </CommandGroup>
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
+                          {followedPubkeys
+                            .map((pubkey) => {
+                              const metadata = authorMetadata[pubkey];
+                              const displayName = metadata?.name || metadata?.display_name;
+                              return { pubkey, displayName, metadata };
+                            })
+                            .filter(({ displayName }) => displayName)
+                            .sort((a, b) => a.displayName!.localeCompare(b.displayName!))
+                            .map(({ pubkey, displayName }) => (
+                              <CommandItem
+                                key={pubkey}
+                                value={displayName!}
+                                onSelect={() => {
+                                  setAuthorPubkey(pubkey);
+                                  setAuthorInputValue(displayName!);
+                                  setAuthorPopoverOpen(false);
+                                }}
+                              >
+                                <Check className={authorPubkey === pubkey ? 'mr-2 h-4 w-4 opacity-100' : 'mr-2 h-4 w-4 opacity-0'} />
+                                <span className="truncate">{displayName}</span>
+                              </CommandItem>
+                            ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              </div>
+              {isLoading && (
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground shrink-0" />
+              )}
+            </div>
+            <label className="flex items-center gap-2 cursor-pointer text-sm text-muted-foreground hover:text-foreground">
+              <Checkbox
+                checked={followOnly}
+                onCheckedChange={(checked) => setFollowOnly(checked === true)}
+              />
+              <span>Show videos from people I follow only</span>
+            </label>
           </div>
         </DialogHeader>
 
@@ -236,27 +273,37 @@ export function VideoPickerModal({
           ) : videos.length === 0 ? (
             <div className="flex items-center justify-center h-full text-muted-foreground">
               {effectiveAuthor
-                ? 'No videos from this user'
-                : searchQuery
-                  ? 'No videos found for your search'
+                ? 'No videos from this user on connected relays'
+                : effectiveAuthorPubkeys?.length
+                  ? 'No videos from people you follow'
                   : 'No videos available'}
             </div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 pb-4">
-              {videos.map((video) => (
-                <VideoCard
-                  key={video.id}
-                  video={video}
-                  onQuickAdd={() => {
-                    onSelectVideo(video);
-                    onClose();
-                  }}
-                  showQuickAdd={true}
-                  onBlockUser={(pubkey) => {
-                    onAddToBlocklist(pubkey);
-                  }}
-                />
-              ))}
+            <div className="space-y-4 pb-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                {visibleVideos.map((video) => (
+                  <VideoCard
+                    key={video.id}
+                    video={video}
+                    authorName={videoAuthorMetadata[video.pubkey]?.name || videoAuthorMetadata[video.pubkey]?.display_name}
+                    onQuickAdd={() => {
+                      onSelectVideo(video);
+                      onClose();
+                    }}
+                    showQuickAdd={true}
+                    onBlockUser={(pubkey) => {
+                      onAddToBlocklist(pubkey);
+                    }}
+                  />
+                ))}
+              </div>
+              {hasMore && (
+                <div className="flex justify-center pt-2">
+                  <Button variant="outline" size="lg" onClick={handleShowMore}>
+                    Show more ({videos.length - visibleCount} remaining)
+                  </Button>
+                </div>
+              )}
             </div>
           )}
         </div>
