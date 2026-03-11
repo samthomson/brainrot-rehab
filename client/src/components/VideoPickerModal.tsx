@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -30,8 +30,6 @@ import { useBulkAuthorMetadata } from '@/hooks/useAuthor';
 import { VideoCard } from '@/components/VideoCard';
 import { nip19 } from 'nostr-tools';
 import type { Video } from '@/types/video';
-
-const PAGE_SIZE = 40;
 
 /** Returns hex pubkey or null. Tries input as-is, then npub1+input. */
 function tryDecodeNpub(s: string): string | null {
@@ -71,7 +69,6 @@ export function VideoPickerModal({
   const [authorInputValue, setAuthorInputValue] = useState('');
   const [authorPopoverOpen, setAuthorPopoverOpen] = useState(false);
   const [followOnly, setFollowOnly] = useState(false);
-  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
   const { data: contactList } = useContactList();
   const followedPubkeys = useMemo(() => {
@@ -87,50 +84,53 @@ export function VideoPickerModal({
   const effectiveAuthorPubkeys =
     effectiveAuthor ? undefined : (followOnly && followedPubkeys.length ? followedPubkeys : undefined);
 
-  const { data: allVideos = [], isLoading } = useShortFormVideos(
+  const {
+    data,
+    isLoading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useShortFormVideos(
     undefined,
     effectiveAuthor || undefined,
     effectiveAuthorPubkeys
   );
 
+  const allFetchedVideos = useMemo(() => {
+    if (!data?.pages) return [];
+    const seen = new Set<string>();
+    const out: Video[] = [];
+    for (const page of data.pages) {
+      for (const v of page) {
+        if (seen.has(v.id)) continue;
+        seen.add(v.id);
+        out.push(v);
+      }
+    }
+    out.sort((a, b) => b.publishedAt - a.publishedAt);
+    return out;
+  }, [data?.pages]);
+
   // When user explicitly filters by npub, show that author's videos even if blocked
   const videos = useMemo(
-    () => allVideos.filter(
+    () => allFetchedVideos.filter(
       (v) => !blocklist.includes(v.pubkey) || v.pubkey === effectiveAuthor
     ),
-    [allVideos, blocklist, effectiveAuthor]
+    [allFetchedVideos, blocklist, effectiveAuthor]
   );
 
-  const visibleVideos = useMemo(
-    () => videos.slice(0, visibleCount),
-    [videos, visibleCount]
+  const videoPubkeys = useMemo(
+    () => [...new Set(videos.map((v) => v.pubkey))],
+    [videos]
   );
-
-  const hasMore = visibleCount < videos.length;
-
-  // Batch-fetch author metadata for all visible videos
-  const visiblePubkeys = useMemo(
-    () => [...new Set(visibleVideos.map((v) => v.pubkey))],
-    [visibleVideos]
-  );
-  const { data: videoAuthorMetadata = {} } = useBulkAuthorMetadata(visiblePubkeys);
-
-  // Reset visible count when filters change
-  useEffect(() => {
-    setVisibleCount(PAGE_SIZE);
-  }, [effectiveAuthor, effectiveAuthorPubkeys, followOnly]);
+  const { data: videoAuthorMetadata = {} } = useBulkAuthorMetadata(videoPubkeys);
 
   useEffect(() => {
     if (!open) {
       setAuthorPubkey(null);
       setAuthorInputValue('');
-      setVisibleCount(PAGE_SIZE);
     }
   }, [open]);
-
-  const handleShowMore = useCallback(() => {
-    setVisibleCount((prev) => prev + PAGE_SIZE);
-  }, []);
 
   // Decode npub when user types/pastes in the input (works for anyone, not just followed)
   useEffect(() => {
@@ -281,7 +281,7 @@ export function VideoPickerModal({
           ) : (
             <div className="space-y-4 pb-4">
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                {visibleVideos.map((video) => (
+                {videos.map((video) => (
                   <VideoCard
                     key={video.id}
                     video={video}
@@ -297,10 +297,21 @@ export function VideoPickerModal({
                   />
                 ))}
               </div>
-              {hasMore && (
+              {hasNextPage && (
                 <div className="flex justify-center pt-2">
-                  <Button variant="outline" size="lg" onClick={handleShowMore}>
-                    Show more ({videos.length - visibleCount} remaining)
+                  <Button
+                    size="lg"
+                    onClick={() => fetchNextPage()}
+                    disabled={isFetchingNextPage}
+                  >
+                    {isFetchingNextPage ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Loading…
+                      </>
+                    ) : (
+                      'Load more'
+                    )}
                   </Button>
                 </div>
               )}

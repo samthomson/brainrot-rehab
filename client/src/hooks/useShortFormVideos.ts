@@ -1,7 +1,9 @@
 import { useNostr } from '@nostrify/react';
-import { useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery } from '@tanstack/react-query';
 import type { NostrEvent } from '@nostrify/nostrify';
 import type { Video } from '@/types/video';
+
+const PAGE_LIMIT = 100;
 
 function parseVideoEvent(event: NostrEvent): Video | null {
   try {
@@ -59,46 +61,48 @@ export function useShortFormVideos(
       ? authorPubkeys
       : undefined;
 
-  return useQuery({
+  return useInfiniteQuery({
     queryKey: ['short-form-videos', searchTerm, authors ?? null],
-    queryFn: async () => {
-      const filters: Array<{
+    queryFn: async ({ pageParam }: { pageParam: number | undefined }) => {
+      const filter: {
         kinds: number[];
         limit: number;
+        until?: number;
         search?: string;
         authors?: string[];
-      }> = [
-        {
-          kinds: [22, 34236, 34326],
-          limit: 500,
-        },
-      ];
+      } = {
+        kinds: [22, 34236, 34326],
+        limit: PAGE_LIMIT,
+      };
 
+      if (pageParam != null) {
+        filter.until = pageParam;
+      }
       if (authors?.length) {
-        filters[0].authors = authors;
+        filter.authors = authors;
       }
-      if (searchTerm && searchTerm.trim()) {
-        filters[0].search = searchTerm.trim();
+      if (searchTerm?.trim()) {
+        filter.search = searchTerm.trim();
       }
 
-      const events = await nostr.query(filters, {
+      const events = await nostr.query([filter], {
         signal: AbortSignal.timeout(15_000),
       });
 
       const videos: Video[] = [];
-      
       for (const event of events) {
         const video = parseVideoEvent(event);
-        if (video) {
-          videos.push(video);
-        }
+        if (video) videos.push(video);
       }
-
-      // Sort by most recent first
       videos.sort((a, b) => b.publishedAt - a.publishedAt);
-
       return videos;
     },
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    initialPageParam: undefined as number | undefined,
+    getNextPageParam: (lastPage) => {
+      if (lastPage.length < PAGE_LIMIT) return undefined;
+      const oldest = Math.min(...lastPage.map((v) => v.publishedAt));
+      return oldest - 1;
+    },
+    staleTime: 5 * 60 * 1000,
   });
 }
