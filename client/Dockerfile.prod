@@ -6,6 +6,8 @@ ARG VITE_BLOSSOM_UPLOAD_URL
 ENV VITE_DVM_PUBKEY=${VITE_DVM_PUBKEY}
 ENV VITE_RELAYS=${VITE_RELAYS}
 ENV VITE_BLOSSOM_UPLOAD_URL=${VITE_BLOSSOM_UPLOAD_URL}
+RUN test -n "$VITE_RELAYS" || (echo "ERROR: VITE_RELAYS build arg is required" && exit 1)
+RUN test -n "$VITE_BLOSSOM_UPLOAD_URL" || (echo "ERROR: VITE_BLOSSOM_UPLOAD_URL build arg is required" && exit 1)
 COPY package.json package-lock.json* ./
 RUN npm ci
 COPY . .
