@@ -3,7 +3,7 @@ import { NostrEvent, NostrFilter, NPool, NRelay1 } from '@nostrify/nostrify';
 import { NostrContext } from '@nostrify/react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAppContext } from '@/hooks/useAppContext';
-import { BRAINROT_RELAY_URL, DEFAULT_DVM_RELAYS } from '@/lib/dvmRelays';
+import { DEFAULT_DVM_RELAYS } from '@/lib/dvmRelays';
 
 function getDvmRelays(): string[] {
   try {
@@ -44,32 +44,37 @@ const NostrProvider: React.FC<NostrProviderProps> = (props) => {
       reqRouter(filters: NostrFilter[]) {
         const routes = new Map<string, NostrFilter[]>();
 
-        // Route to all read relays
-        const readRelays = relayMetadata.current.relays
-          .filter(r => r.read)
-          .map(r => r.url);
-
-        for (const url of readRelays) {
-          routes.set(url, filters);
-        }
-
-        // Always include DVM relays + essential video relays for video queries
-        const needsVideoRelays = filters.some(
-          f => f.kinds?.includes(22) || f.kinds?.includes(34236) || f.kinds?.includes(34326) || f.kinds?.includes(30534)
+        const isVideoQuery = filters.some(
+          f => f.kinds?.includes(22) || f.kinds?.includes(34236) || f.kinds?.includes(34326)
         );
-        
-        if (needsVideoRelays) {
-          const dvmRelays = getDvmRelays();
-          const essentialVideoRelays = new Set([
-            ...dvmRelays,
-            BRAINROT_RELAY_URL,
-            'wss://relay.divine.video',
-          ]);
-          
-          for (const relay of essentialVideoRelays) {
-            if (!routes.has(relay)) {
-              routes.set(relay, filters);
-            }
+        const isDvmJobQuery = filters.some(f => f.kinds?.includes(30534));
+
+        if (isVideoQuery) {
+          // Video browsing: query user's personal relays + divine
+          const readRelays = relayMetadata.current.relays
+            .filter(r => r.read)
+            .map(r => r.url);
+          for (const url of readRelays) {
+            routes.set(url, filters);
+          }
+          routes.set('wss://relay.divine.video', filters);
+
+          // Also include DVM relay for user's own videos (where DVM publishes)
+          for (const relay of getDvmRelays()) {
+            routes.set(relay, filters);
+          }
+        } else if (isDvmJobQuery) {
+          // DVM job status: only query DVM relays
+          for (const relay of getDvmRelays()) {
+            routes.set(relay, filters);
+          }
+        } else {
+          // Other queries: use user's personal relays
+          const readRelays = relayMetadata.current.relays
+            .filter(r => r.read)
+            .map(r => r.url);
+          for (const url of readRelays) {
+            routes.set(url, filters);
           }
         }
 

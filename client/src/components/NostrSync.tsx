@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { useNostr } from '@nostrify/react';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { useAppContext } from '@/hooks/useAppContext';
-import { BRAINROT_RELAY_URL } from '@/lib/dvmRelays';
+import { DEFAULT_DVM_RELAYS } from '@/lib/dvmRelays';
 
 /**
  * NostrSync - Syncs user's Nostr data
@@ -39,34 +39,12 @@ export function NostrSync() {
                 write: !marker || marker === 'write',
               }));
 
-            // Always include essential video relays
-            const essentialRelays = [
-              {
-                url: BRAINROT_RELAY_URL,
-                read: true,
-                write: true,
-              },
-              {
-                url: 'wss://relay.divine.video',
-                read: true,
-                write: true,
-              },
-            ];
-
-            // Merge essential relays with user's relay list
-            const mergedRelays = [...essentialRelays];
-            for (const relay of fetchedRelays) {
-              if (!mergedRelays.some((r) => r.url === relay.url)) {
-                mergedRelays.push(relay);
-              }
-            }
-
-            if (mergedRelays.length > 0) {
-              console.log('Syncing relay list from Nostr:', mergedRelays);
+            if (fetchedRelays.length > 0) {
+              console.log('Syncing relay list from Nostr:', fetchedRelays);
               updateConfig((current) => ({
                 ...current,
                 relayMetadata: {
-                  relays: mergedRelays,
+                  relays: fetchedRelays,
                   updatedAt: event.created_at,
                 },
               }));
