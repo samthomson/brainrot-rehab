@@ -3,7 +3,15 @@ import { NostrEvent, NostrFilter, NPool, NRelay1 } from '@nostrify/nostrify';
 import { NostrContext } from '@nostrify/react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAppContext } from '@/hooks/useAppContext';
-import { BRAINROT_RELAY_URL } from '@/lib/dvmRelays';
+import { BRAINROT_RELAY_URL, DEFAULT_DVM_RELAYS } from '@/lib/dvmRelays';
+
+function getDvmRelays(): string[] {
+  try {
+    const raw = localStorage.getItem('dvm-enabled-relays');
+    if (raw) return JSON.parse(raw) as string[];
+  } catch { /* ignore */ }
+  return DEFAULT_DVM_RELAYS;
+}
 
 interface NostrProviderProps {
   children: React.ReactNode;
@@ -45,16 +53,18 @@ const NostrProvider: React.FC<NostrProviderProps> = (props) => {
           routes.set(url, filters);
         }
 
-        // Always include essential video relays for video queries
+        // Always include DVM relays + essential video relays for video queries
         const needsVideoRelays = filters.some(
           f => f.kinds?.includes(22) || f.kinds?.includes(34236) || f.kinds?.includes(34326) || f.kinds?.includes(30534)
         );
         
         if (needsVideoRelays) {
-          const essentialVideoRelays = [
+          const dvmRelays = getDvmRelays();
+          const essentialVideoRelays = new Set([
+            ...dvmRelays,
             BRAINROT_RELAY_URL,
             'wss://relay.divine.video',
-          ];
+          ]);
           
           for (const relay of essentialVideoRelays) {
             if (!routes.has(relay)) {

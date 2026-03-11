@@ -20,7 +20,7 @@ process.on('unhandledRejection', (reason) => {
 import { runJob } from './job.js'
 import { JOB_REQUEST_KIND } from './types.js'
 
-/** Must match client's BRAINROT_RELAY_URL - client publishes jobs here. */
+/** Relay(s) to subscribe to for job requests. Must include whatever relay(s) the client publishes to (user picks in Settings → DVM Relay Pool). */
 const DEFAULT_RELAY = 'wss://relay.brainrot.rehab'
 const RELAYS = (process.env.RELAYS || DEFAULT_RELAY).split(',').map((s) => s.trim())
 const DVM_SECRET_KEY_HEX = process.env.DVM_SECRET_KEY

@@ -15,7 +15,8 @@ import { useToast } from '@/hooks/useToast';
 import { BroadcastButton } from '@/components/BroadcastButton';
 import { DVMJobStatus } from '@/components/DVMJobStatus';
 import { useDVMJob } from '@/hooks/useDVMJob';
-import { BRAINROT_RELAY_URL, DEFAULT_BLOSSOM_UPLOAD_URL, DEFAULT_DVM_PUBKEY } from '@/lib/dvmRelays';
+import { useDvmRelays } from '@/contexts/DvmRelaysContext';
+import { DEFAULT_BLOSSOM_UPLOAD_URL, DEFAULT_DVM_PUBKEY, DEFAULT_DVM_RELAYS } from '@/lib/dvmRelays';
 import type { NostrEvent } from '@nostrify/nostrify';
 import type { Video, SourceVideo, TimelineSegment, RemixData } from '@/types/video';
 
@@ -35,8 +36,8 @@ export default function RehabPage() {
   const [sourceSegments, setSourceSegments] = usePersistedState<SourceSegment[]>('video-remix-source-segments', []);
   const [timelineSegments, setTimelineSegments] = usePersistedState<TimelineSegment[]>('video-remix-timeline', []);
   const [blocklist, setBlocklist] = usePersistedState<string[]>('video-remix-blocklist', []);
-  const [additionalRelays] = usePersistedState<string[]>('video-remix-additional-relays', []);
-  const relayPool = [BRAINROT_RELAY_URL, ...additionalRelays];
+  const { enabledRelays } = useDvmRelays();
+  const relayPool = enabledRelays.length > 0 ? enabledRelays : DEFAULT_DVM_RELAYS;
   const [blossomUploadUrl] = usePersistedState<string>('video-remix-blossom-url', DEFAULT_BLOSSOM_UPLOAD_URL);
   const [dvmPubkey] = usePersistedState<string>('video-remix-dvm-pubkey', DEFAULT_DVM_PUBKEY);
 

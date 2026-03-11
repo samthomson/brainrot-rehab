@@ -22,6 +22,8 @@ docker compose up --build
 
 Both services auto-reload on file changes via volume mounts.
 
+**Using a different relay in local dev:** If you change the DVM relay in the app (Settings → DVM Relay Pool) to a test relay (e.g. `wss://relay.local`), you must run the DVM with that same relay so it receives jobs. In `.env` set e.g. `RELAYS=wss://relay.local` (or a comma-separated list), then restart the DVM. The DVM only listens on the relay(s) in `RELAYS`; the client publishes to whatever you selected in Settings.
+
 ### Production deployment
 
 For video building to work in production you need **both**:
@@ -285,3 +287,5 @@ Compose: `docker-compose.prod.yml`.
 - [ ] highlight brainrot in ui for adding videos
 - [ ] neon green favicon
 - [ ] use an existing brainrot as a template
+- [ ] cahnge source videos to 'ingredients' or somethign more fun
+- [ ] outbox

@@ -11,31 +11,31 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Radio, ChevronDown } from 'lucide-react';
 import { useToast } from '@/hooks/useToast';
 import { usePersistedState } from '@/hooks/usePersistedState';
-import { BRAINROT_RELAY_URL, OPTIONAL_RELAY_PRESETS } from '@/lib/dvmRelays';
+import { ALL_DVM_RELAY_PRESETS } from '@/lib/dvmRelays';
 
 interface RelaySelectorProps {
-  /** Enabled additional relays (brainrot is always in the pool). */
-  additionalRelays: string[];
-  onAdditionalRelaysChange: (urls: string[]) => void;
+  /** All enabled DVM relays (user can toggle any on/off). */
+  enabledRelays: string[];
+  onEnabledRelaysChange: (urls: string[]) => void;
 }
 
 function stripScheme(url: string): string {
   return url.replace(/^wss:\/\//, '').replace(/^ws:\/\//, '');
 }
 
-export function RelaySelector({ additionalRelays, onAdditionalRelaysChange }: RelaySelectorProps) {
+export function RelaySelector({ enabledRelays, onEnabledRelaysChange }: RelaySelectorProps) {
   const [customInput, setCustomInput] = useState('');
   const [open, setOpen] = useState(false);
   const { toast } = useToast();
   const [customRelayUrls, setCustomRelayUrls] = usePersistedState<string[]>('dvm-custom-relays', []);
 
-  const allOptionalUrls = [...OPTIONAL_RELAY_PRESETS, ...customRelayUrls];
+  const allRelayOptions = [...ALL_DVM_RELAY_PRESETS, ...customRelayUrls];
 
   const toggleRelay = (url: string, enabled: boolean) => {
     if (enabled) {
-      onAdditionalRelaysChange([...additionalRelays, url]);
+      onEnabledRelaysChange([...enabledRelays, url]);
     } else {
-      onAdditionalRelaysChange(additionalRelays.filter((u) => u !== url));
+      onEnabledRelaysChange(enabledRelays.filter((u) => u !== url));
     }
   };
 
@@ -52,17 +52,19 @@ export function RelaySelector({ additionalRelays, onAdditionalRelaysChange }: Re
     if (!customRelayUrls.includes(url)) {
       setCustomRelayUrls((prev) => [...prev, url]);
     }
-    if (!additionalRelays.includes(url)) {
-      onAdditionalRelaysChange([...additionalRelays, url]);
+    if (!enabledRelays.includes(url)) {
+      onEnabledRelaysChange([...enabledRelays, url]);
     }
     setCustomInput('');
     setOpen(false);
     toast({ title: 'Relay added', description: stripScheme(url) });
   };
 
-  const displayLabel = additionalRelays.length === 0
-    ? stripScheme(BRAINROT_RELAY_URL)
-    : `${stripScheme(BRAINROT_RELAY_URL)} +${additionalRelays.length}`;
+  const displayLabel = enabledRelays.length === 0
+    ? 'No relays'
+    : enabledRelays.length === 1
+      ? stripScheme(enabledRelays[0])
+      : `${enabledRelays.length} relays`;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -78,24 +80,20 @@ export function RelaySelector({ additionalRelays, onAdditionalRelaysChange }: Re
           <div>
             <h4 className="font-semibold mb-2">DVM relay pool</h4>
             <p className="text-xs text-muted-foreground mb-3">
-              Our relay is always used; optionally add more.
+              Toggle relays on or off. At least one must be enabled.
             </p>
           </div>
 
-          <div className="text-sm font-medium text-muted-foreground">
-            Always on: {stripScheme(BRAINROT_RELAY_URL)}
-          </div>
-
           <div className="space-y-2">
-            <Label className="text-xs">Additional relays</Label>
-            {allOptionalUrls.map((url) => (
+            <Label className="text-xs">Relays</Label>
+            {allRelayOptions.map((url) => (
               <div key={url} className="flex items-center gap-2">
                 <Checkbox
-                  id={url}
-                  checked={additionalRelays.includes(url)}
+                  id={`relay-${url}`}
+                  checked={enabledRelays.includes(url)}
                   onCheckedChange={(checked) => toggleRelay(url, checked === true)}
                 />
-                <label htmlFor={url} className="text-sm cursor-pointer flex-1 truncate">
+                <label htmlFor={`relay-${url}`} className="text-sm cursor-pointer flex-1 truncate">
                   {stripScheme(url)}
                 </label>
               </div>

@@ -1,5 +1,8 @@
-/** Single source of truth: DVM relay for brainrot.rehab (always in pool). */
+/** Single source of truth: DVM relay for brainrot.rehab. */
 export const BRAINROT_RELAY_URL = 'wss://relay.brainrot.rehab';
+
+/** Default DVM relay list (user can toggle any on/off in Settings). */
+export const DEFAULT_DVM_RELAYS = [BRAINROT_RELAY_URL];
 
 /** Default Blossom server URL for DVM video uploads. */
 export const DEFAULT_BLOSSOM_UPLOAD_URL = 'https://blossom.brainrot.rehab';
@@ -18,3 +21,6 @@ export const OPTIONAL_RELAY_PRESETS = [
   'wss://nos.lol',
   'wss://relay.nostr.band',
 ] as const;
+
+/** All preset relay options for DVM (brainrot first, then optional). Used for Settings UI. */
+export const ALL_DVM_RELAY_PRESETS = [BRAINROT_RELAY_URL, ...OPTIONAL_RELAY_PRESETS];

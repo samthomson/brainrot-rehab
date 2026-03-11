@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/useToast';
 import { usePersistedState } from '@/hooks/usePersistedState';
-import { BRAINROT_RELAY_URL, DEFAULT_BLOSSOM_UPLOAD_URL, OPTIONAL_RELAY_PRESETS } from '@/lib/dvmRelays';
+import { ALL_DVM_RELAY_PRESETS, DEFAULT_BLOSSOM_UPLOAD_URL } from '@/lib/dvmRelays';
 
 interface SettingsModalProps {
   open: boolean;
@@ -20,8 +20,8 @@ interface SettingsModalProps {
   onDvmPubkeyChange: (pubkey: string) => void;
   blossomUploadUrl: string;
   onBlossomUrlChange: (url: string) => void;
-  additionalRelays: string[];
-  onAdditionalRelaysChange: (urls: string[]) => void;
+  enabledRelays: string[];
+  onEnabledRelaysChange: (urls: string[]) => void;
 }
 
 function stripScheme(url: string): string {
@@ -35,20 +35,20 @@ export function SettingsModal({
   onDvmPubkeyChange,
   blossomUploadUrl,
   onBlossomUrlChange,
-  additionalRelays,
-  onAdditionalRelaysChange,
+  enabledRelays,
+  onEnabledRelaysChange,
 }: SettingsModalProps) {
   const { toast } = useToast();
   const [customInput, setCustomInput] = useState('');
   const [customRelayUrls, setCustomRelayUrls] = usePersistedState<string[]>('dvm-custom-relays', []);
 
-  const allOptionalUrls = [...OPTIONAL_RELAY_PRESETS, ...customRelayUrls];
+  const allRelayOptions = [...ALL_DVM_RELAY_PRESETS, ...customRelayUrls];
 
   const toggleRelay = (url: string, enabled: boolean) => {
     if (enabled) {
-      onAdditionalRelaysChange([...additionalRelays, url]);
+      onEnabledRelaysChange([...enabledRelays, url]);
     } else {
-      onAdditionalRelaysChange(additionalRelays.filter((u) => u !== url));
+      onEnabledRelaysChange(enabledRelays.filter((u) => u !== url));
     }
   };
 
@@ -65,8 +65,8 @@ export function SettingsModal({
     if (!customRelayUrls.includes(url)) {
       setCustomRelayUrls((prev) => [...prev, url]);
     }
-    if (!additionalRelays.includes(url)) {
-      onAdditionalRelaysChange([...additionalRelays, url]);
+    if (!enabledRelays.includes(url)) {
+      onEnabledRelaysChange([...enabledRelays, url]);
     }
     setCustomInput('');
     toast({ title: 'Relay added', description: stripScheme(url) });
@@ -77,6 +77,14 @@ export function SettingsModal({
       toast({
         title: 'Invalid Pubkey',
         description: 'DVM pubkey must be 64 characters (hex)',
+        variant: 'destructive',
+      });
+      return;
+    }
+    if (enabledRelays.length === 0) {
+      toast({
+        title: 'At least one relay required',
+        description: 'Enable at least one DVM relay to send jobs.',
         variant: 'destructive',
       });
       return;
@@ -121,18 +129,15 @@ export function SettingsModal({
           <div className="space-y-4 pt-4 border-t">
             <h4 className="font-semibold">DVM Relay Pool</h4>
             <p className="text-xs text-muted-foreground">
-              Our relay is always used; optionally add more for DVM jobs.
+              Choose which relays to use for DVM jobs. At least one must be enabled. You can turn off the default and use only a custom relay.
             </p>
-            <div className="text-sm font-medium text-muted-foreground">
-              Always on: {stripScheme(BRAINROT_RELAY_URL)}
-            </div>
             <div className="space-y-2">
-              <Label className="text-xs">Additional relays</Label>
-              {allOptionalUrls.map((url) => (
+              <Label className="text-xs">Relays</Label>
+              {allRelayOptions.map((url) => (
                 <div key={url} className="flex items-center gap-2">
                   <Checkbox
                     id={url}
-                    checked={additionalRelays.includes(url)}
+                    checked={enabledRelays.includes(url)}
                     onCheckedChange={(checked) => toggleRelay(url, checked === true)}
                   />
                   <label htmlFor={url} className="text-sm cursor-pointer flex-1 truncate">
