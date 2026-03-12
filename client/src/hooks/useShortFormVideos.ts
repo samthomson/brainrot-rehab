@@ -51,7 +51,8 @@ function parseVideoEvent(event: NostrEvent): Video | null {
 export function useShortFormVideos(
   searchTerm?: string,
   authorPubkey?: string | null,
-  authorPubkeys?: string[] | null
+  authorPubkeys?: string[] | null,
+  enabled = true
 ) {
   const { nostr } = useNostr();
 
@@ -63,6 +64,7 @@ export function useShortFormVideos(
 
   return useInfiniteQuery({
     queryKey: ['short-form-videos', searchTerm, authors ?? null],
+    enabled,
     queryFn: async ({ pageParam }: { pageParam: number | undefined }) => {
       const filter: {
         kinds: number[];

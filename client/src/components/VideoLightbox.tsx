@@ -9,6 +9,7 @@ import { useRepost } from '@/hooks/useRepost';
 import { useComments } from '@/hooks/useComments';
 import { usePostComment } from '@/hooks/usePostComment';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
+import { useFavoriteVideos } from '@/hooks/useFavorites';
 import { useToast } from '@/hooks/useToast';
 import { useZaps } from '@/hooks/useZaps';
 import { useWallet } from '@/hooks/useWallet';
@@ -16,7 +17,7 @@ import { ZapDialog } from '@/components/ZapDialog';
 import { useIsFollowing, useToggleFollow } from '@/hooks/useFollow';
 import { UserPlus, UserMinus, Copy } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
-import { Heart, Repeat2, MessageSquare, Send, Zap, Play, Pause } from 'lucide-react';
+import { Heart, Repeat2, MessageSquare, Send, Zap, Play, Pause, Bookmark } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { nip19 } from 'nostr-tools';
 import { Link } from 'react-router-dom';
@@ -177,6 +178,7 @@ export function VideoLightbox({ video, open, onOpenChange }: VideoLightboxProps)
   const videoRef = useRef<HTMLVideoElement>(null);
   const { displayName } = useVideoAuthor(video ?? { pubkey: '', event: { pubkey: '' } } as Video);
   const { user } = useCurrentUser();
+  const { favoriteIdSet, toggleFavorite, isTogglingFavorite } = useFavoriteVideos();
   const { toast } = useToast();
   const { webln, activeNWC } = useWallet();
 
@@ -281,6 +283,7 @@ export function VideoLightbox({ video, open, onOpenChange }: VideoLightboxProps)
   };
 
   const hasSources = sourceRefs.length > 0;
+  const isFavorite = favoriteIdSet.has(video.id);
   const formatDate = (timestamp: number) => {
     try {
       return formatDistanceToNow(new Date(timestamp * 1000), { addSuffix: true });
@@ -424,6 +427,30 @@ export function VideoLightbox({ video, open, onOpenChange }: VideoLightboxProps)
                 >
                   <Repeat2 className="h-4 w-4" />
                   <span className="text-xs">Repost</span>
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={isTogglingFavorite}
+                  onClick={async () => {
+                    if (!user) {
+                      toast({ title: 'Login required', description: 'Log in to save favorites', variant: 'destructive' });
+                      return;
+                    }
+                    try {
+                      await toggleFavorite(video.id);
+                      toast({
+                        title: isFavorite ? 'Removed from favorites' : 'Added to favorites',
+                        description: isFavorite ? 'Video removed from saved list' : 'Video saved',
+                      });
+                    } catch (e) {
+                      toast({ title: 'Failed to update favorites', description: String(e), variant: 'destructive' });
+                    }
+                  }}
+                  className="gap-1.5 h-8"
+                >
+                  <Bookmark className={`h-4 w-4 ${isFavorite ? 'fill-current text-primary' : ''}`} />
+                  <span className="text-xs">{isFavorite ? 'Saved' : 'Save'}</span>
                 </Button>
                 <Button
                   variant="ghost"

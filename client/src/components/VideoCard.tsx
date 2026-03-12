@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, memo } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { Play, Pause, Plus, Copy, Ban } from 'lucide-react';
+import { Play, Pause, Plus, Copy, Ban, Bookmark } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { formatDistanceToNow } from 'date-fns';
 import { useVideoAuthor } from '@/hooks/useVideoAuthor';
@@ -15,9 +15,22 @@ interface VideoCardProps {
   showQuickAdd?: boolean;
   onBlockUser?: (pubkey: string) => void;
   onClick?: () => void;
+  isFavorite?: boolean;
+  onToggleFavorite?: (eventId: string) => Promise<void>;
+  isTogglingFavorite?: boolean;
 }
 
-export const VideoCard = memo(function VideoCard({ video, authorName, onQuickAdd, showQuickAdd = false, onBlockUser, onClick }: VideoCardProps) {
+export const VideoCard = memo(function VideoCard({
+  video,
+  authorName,
+  onQuickAdd,
+  showQuickAdd = false,
+  onBlockUser,
+  onClick,
+  isFavorite = false,
+  onToggleFavorite,
+  isTogglingFavorite = false,
+}: VideoCardProps) {
   const skipAuthorQuery = !!authorName;
   const fallback = useVideoAuthor(skipAuthorQuery ? undefined : video);
   const displayName = authorName || fallback.displayName;
@@ -200,6 +213,37 @@ export const VideoCard = memo(function VideoCard({ video, authorName, onQuickAdd
                 }}
               >
                 <Plus className="h-4 w-4" />
+              </Button>
+            )}
+            {onToggleFavorite && (
+              <Button
+                size="icon"
+                variant={isFavorite ? 'default' : 'secondary'}
+                className="rounded-full shadow-lg h-8 w-8"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleFavorite(video.id)
+                    .then(() => {
+                      toast({
+                        title: isFavorite ? 'Removed from favorites' : 'Added to favorites',
+                        description: isFavorite ? 'Video removed from saved list' : 'Video saved',
+                      });
+                    })
+                    .catch((error: unknown) => {
+                      const message = String(error);
+                      toast({
+                        title: message.toLowerCase().includes('login required') ? 'Login required' : 'Failed to update favorites',
+                        description: message.toLowerCase().includes('login required')
+                          ? 'Log in to save favorites'
+                          : message,
+                        variant: 'destructive',
+                      });
+                    });
+                }}
+                disabled={isTogglingFavorite}
+                title={isFavorite ? 'Remove from saved' : 'Save video'}
+              >
+                <Bookmark className={`h-3.5 w-3.5 ${isFavorite ? 'fill-current' : ''}`} />
               </Button>
             )}
             <Button

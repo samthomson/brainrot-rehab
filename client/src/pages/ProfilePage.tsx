@@ -12,12 +12,14 @@ import { UserPlus, UserMinus } from 'lucide-react';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { useIsFollowing, useToggleFollow } from '@/hooks/useFollow';
 import { useToast } from '@/hooks/useToast';
+import { useFavoriteVideos } from '@/hooks/useFavorites';
 import { Link } from 'react-router-dom';
 
 export default function ProfilePage() {
   const { npub } = useParams<{ npub: string }>();
   const [lightboxVideo, setLightboxVideo] = useState<Video | null>(null);
   const { user } = useCurrentUser();
+  const { favoriteIdSet, toggleFavorite, isTogglingFavorite } = useFavoriteVideos();
   const { toast } = useToast();
 
   let pubkey: string | undefined;
@@ -167,6 +169,9 @@ export default function ProfilePage() {
                   key={video.id}
                   video={video}
                   onClick={() => setLightboxVideo(video)}
+                  isFavorite={favoriteIdSet.has(video.id)}
+                  onToggleFavorite={toggleFavorite}
+                  isTogglingFavorite={isTogglingFavorite}
                 />
               ))}
             </div>

@@ -3,6 +3,7 @@ import { useSeoMeta } from '@unhead/react';
 import { VideoCard } from '@/components/VideoCard';
 import { VideoLightbox } from '@/components/VideoLightbox';
 import { useBrainrotVideos } from '@/hooks/useBrainrotVideos';
+import { useFavoriteVideos } from '@/hooks/useFavorites';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Link } from 'react-router-dom';
 import type { Video } from '@/types/video';
@@ -14,6 +15,7 @@ export default function RotPage() {
   });
 
   const { data: videos = [], isLoading, isError } = useBrainrotVideos();
+  const { favoriteIdSet, toggleFavorite, isTogglingFavorite } = useFavoriteVideos();
   const [lightboxVideo, setLightboxVideo] = useState<Video | null>(null);
 
   return (
@@ -49,6 +51,9 @@ export default function RotPage() {
                 key={video.id}
                 video={video}
                 onClick={() => setLightboxVideo(video)}
+                isFavorite={favoriteIdSet.has(video.id)}
+                onToggleFavorite={toggleFavorite}
+                isTogglingFavorite={isTogglingFavorite}
               />
             ))}
           </div>
