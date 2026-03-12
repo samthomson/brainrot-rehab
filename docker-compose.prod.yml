@@ -1,12 +1,13 @@
+# Env vars from Dokploy Environment are written to .env; compose substitutes them at build time.
 services:
   client:
     build:
       context: ./client
       dockerfile: Dockerfile.prod
       args:
-        - VITE_DVM_PUBKEY=${VITE_DVM_PUBKEY}
-        - VITE_RELAYS=${RELAYS}
-        - VITE_BLOSSOM_UPLOAD_URL=${VITE_BLOSSOM_UPLOAD_URL}
+        VITE_DVM_PUBKEY: ${VITE_DVM_PUBKEY}
+        VITE_RELAYS: ${RELAYS}
+        VITE_BLOSSOM_UPLOAD_URL: ${VITE_BLOSSOM_UPLOAD_URL}
     restart: always
     expose:
       - "3000"
