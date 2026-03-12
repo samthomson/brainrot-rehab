@@ -436,10 +436,14 @@ export function VideoLightbox({ video, open, onOpenChange }: VideoLightboxProps)
                     onOpenChange(false);
                     navigate(`/rehab/${video.id}`);
                   }}
-                  className="gap-1.5 h-8"
+                  className="gap-2 h-8 px-4"
                   title="Open this video in Rehab"
                 >
-                  <img src="/logo.png" alt="" className="h-4 w-auto object-contain" />
+                  <img
+                    src="/logo.png"
+                    alt=""
+                    className="h-5 w-5 object-contain invert [image-rendering:pixelated] [image-rendering:-moz-crisp-edges] [image-rendering:crisp-edges]"
+                  />
                   <span className="text-xs font-semibold">Rehab</span>
                 </Button>
                 <Button
@@ -465,7 +469,7 @@ export function VideoLightbox({ video, open, onOpenChange }: VideoLightboxProps)
                   title={isFavorite ? 'Remove from favorites' : 'Save to favorites'}
                 >
                   <Bookmark className={`h-4 w-4 ${isFavorite ? 'fill-current text-primary' : ''}`} />
-                  <span className="text-xs">{isFavorite ? 'Saved to Favorites' : 'Save to Favorites'}</span>
+                  <span className="text-xs">{isFavorite ? 'Saved' : 'Save'}</span>
                 </Button>
                 <Button
                   variant="ghost"
