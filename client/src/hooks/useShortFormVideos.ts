@@ -99,7 +99,7 @@ export function useShortFormVideos(
     },
     initialPageParam: undefined as number | undefined,
     getNextPageParam: (lastPage) => {
-      if (lastPage.length < PAGE_LIMIT) return undefined;
+      if (lastPage.length === 0) return undefined;
       const oldest = Math.min(...lastPage.map((v) => v.publishedAt));
       return oldest - 1;
     },
