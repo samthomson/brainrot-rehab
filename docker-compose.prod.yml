@@ -8,6 +8,8 @@ services:
         VITE_DVM_PUBKEY: ${VITE_DVM_PUBKEY}
         VITE_RELAYS: ${RELAYS}
         VITE_BLOSSOM_UPLOAD_URL: ${VITE_BLOSSOM_UPLOAD_URL}
+        VITE_PLAUSIBLE_DOMAIN: ${VITE_PLAUSIBLE_DOMAIN}
+        VITE_PLAUSIBLE_SRC: ${VITE_PLAUSIBLE_SRC}
     restart: always
     expose:
       - "3000"
