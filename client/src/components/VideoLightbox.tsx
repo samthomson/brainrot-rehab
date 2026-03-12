@@ -20,7 +20,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { Heart, Repeat2, MessageSquare, Send, Zap, Play, Pause, Bookmark } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { nip19 } from 'nostr-tools';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import type { Video } from '@/types/video';
 
 interface VideoLightboxProps {
@@ -176,6 +176,7 @@ function SourceRefFallbackCard({ sourceRef }: { sourceRef: SourceRef }) {
 
 export function VideoLightbox({ video, open, onOpenChange }: VideoLightboxProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const navigate = useNavigate();
   const { displayName } = useVideoAuthor(video ?? { pubkey: '', event: { pubkey: '' } } as Video);
   const { user } = useCurrentUser();
   const { favoriteIdSet, toggleFavorite, isTogglingFavorite } = useFavoriteVideos();
@@ -427,6 +428,18 @@ export function VideoLightbox({ video, open, onOpenChange }: VideoLightboxProps)
                 >
                   <Repeat2 className="h-4 w-4" />
                   <span className="text-xs">Repost</span>
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    onOpenChange(false);
+                    navigate(`/rehab/${video.id}`);
+                  }}
+                  className="gap-1.5 h-8"
+                  title="Open this video in Rehab"
+                >
+                  <span className="text-xs">Rehab</span>
                 </Button>
                 <Button
                   variant={isFavorite ? 'default' : 'outline'}

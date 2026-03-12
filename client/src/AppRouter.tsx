@@ -17,6 +17,7 @@ export function AppRouter() {
           <Route index element={<Navigate to="/rot" replace />} />
           <Route path="rot" element={<RotPage />} />
           <Route path="rehab" element={<RehabPage />} />
+          <Route path="rehab/:seedId" element={<RehabPage />} />
           <Route path="profile/:npub" element={<ProfilePage />} />
         </Route>
         {/* NIP-19 route for npub1, note1, naddr1, nevent1, nprofile1 */}

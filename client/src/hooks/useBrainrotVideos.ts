@@ -6,6 +6,24 @@ import { BRAINROT_CLIENT_TAG, DEFAULT_BLOSSOM_UPLOAD_URL } from '@/lib/dvmRelays
 
 const QUERY_TIMEOUT_MS = 15_000;
 
+function extractDuration(tags: string[][]): number {
+  const durationTag = tags.find(([name]) => name === 'duration')?.[1];
+  if (durationTag) {
+    const parsed = parseFloat(durationTag);
+    if (!Number.isNaN(parsed) && Number.isFinite(parsed) && parsed > 0) return parsed;
+  }
+
+  const imetaTags = tags.filter(([name]) => name === 'imeta');
+  for (const imeta of imetaTags) {
+    for (const entry of imeta.slice(1)) {
+      if (!entry.startsWith('duration ')) continue;
+      const parsed = parseFloat(entry.replace('duration ', ''));
+      if (!Number.isNaN(parsed) && Number.isFinite(parsed) && parsed > 0) return parsed;
+    }
+  }
+  return 0;
+}
+
 function isBrainrotVideo(event: NostrEvent): boolean {
   const hasClientTag = event.tags.some(
     ([name, value]) => name === 'client' && value === BRAINROT_CLIENT_TAG
@@ -30,7 +48,7 @@ function parseBrainrotVideoEvent(event: NostrEvent): Video | null {
       event,
       name,
       url: urlTag,
-      duration: 0,
+      duration: extractDuration(event.tags),
       thumbnailUrl: undefined,
       pubkey: event.pubkey,
       publishedAt: event.created_at,
@@ -114,7 +132,7 @@ function parseVideoEvent(event: NostrEvent): Video | null {
       event,
       name,
       url: urlTag,
-      duration: 0,
+      duration: extractDuration(event.tags),
       thumbnailUrl: undefined,
       pubkey: event.pubkey,
       publishedAt: event.created_at,
@@ -135,7 +153,7 @@ export function useVideoEventsById(ids: string[]) {
       if (ids.length === 0) return [];
       console.log('[source-videos] Querying for event ids:', ids);
       const events = await nostr.query(
-        [{ ids, limit: ids.length }],
+        [{ ids, kinds: [22, 34236, 34326], limit: ids.length }],
         { signal: AbortSignal.timeout(QUERY_TIMEOUT_MS) }
       );
       console.log('[source-videos] Found events:', events.length, events.map(e => e.id));

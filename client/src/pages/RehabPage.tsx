@@ -1,5 +1,6 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useSeoMeta } from '@unhead/react';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { SourceVideosList } from '@/components/SourceVideosList';
 import { TimelineTrack } from '@/components/TimelineTrack';
 import { DVMPayloadViewer } from '@/components/DVMPayloadViewer';
@@ -15,6 +16,7 @@ import { useToast } from '@/hooks/useToast';
 import { BroadcastButton } from '@/components/BroadcastButton';
 import { DVMJobStatus } from '@/components/DVMJobStatus';
 import { useDVMJob } from '@/hooks/useDVMJob';
+import { useVideoEventsById } from '@/hooks/useBrainrotVideos';
 import { useDvmRelays } from '@/contexts/DvmRelaysContext';
 import { DEFAULT_BLOSSOM_UPLOAD_URL, DEFAULT_DVM_PUBKEY, DVM_RELAYS } from '@/lib/dvmRelays';
 import type { NostrEvent } from '@nostrify/nostrify';
@@ -27,6 +29,10 @@ export default function RehabPage() {
   });
 
   const { toast } = useToast();
+  const { seedId: seedFromPath } = useParams<{ seedId?: string }>();
+  const [searchParams] = useSearchParams();
+  const seedId = (seedFromPath || searchParams.get('seed') || '').trim();
+  const lastAppliedSeedRef = useRef<string | null>(null);
 
   interface SourceSegment {
     id: string;
@@ -47,6 +53,77 @@ export default function RehabPage() {
   const { jobState, broadcastJob, resetJob } = useDVMJob(DEFAULT_DVM_PUBKEY, DVM_RELAYS);
 
   const sourceVideos = sourceSegments.map((s) => s.video);
+  const { data: seedVideos = [], isLoading: isSeedLoading } = useVideoEventsById(seedId ? [seedId] : []);
+  const seededVideo = seedVideos[0];
+
+  const seedSourceIds = useMemo(() => {
+    if (!seededVideo) return [];
+    const mentionIds = seededVideo.event.tags
+      .filter(([name, value, _relay, marker]) => name === 'e' && Boolean(value) && marker === 'mention')
+      .map(([, value]) => value)
+      .filter(Boolean);
+    const fallbackIds = seededVideo.event.tags
+      .filter(([name, value]) => name === 'e' && Boolean(value))
+      .map(([, value]) => value)
+      .filter(Boolean);
+    const ids = mentionIds.length > 0 ? mentionIds : fallbackIds;
+    return [...new Set(ids)];
+  }, [seededVideo]);
+
+  const {
+    data: seededSourceVideos = [],
+    isLoading: isSeedSourcesLoading,
+  } = useVideoEventsById(seedSourceIds);
+
+  useEffect(() => {
+    if (!seedId) {
+      lastAppliedSeedRef.current = null;
+      return;
+    }
+    if (!seededVideo || isSeedLoading) return;
+    if (lastAppliedSeedRef.current === seedId) return;
+    if (seedSourceIds.length > 0 && isSeedSourcesLoading) return;
+
+    const baseVideos = seededSourceVideos.length > 0 ? seededSourceVideos : [seededVideo];
+    const newSourceSegments = baseVideos.map((video) => ({
+      id: crypto.randomUUID(),
+      video: { ...video, segments: [] },
+    }));
+    const newTimelineSegments = newSourceSegments.map((segment, index) => {
+      const fullDuration = segment.video.duration || 0;
+      return {
+        id: segment.id,
+        sourceVideoId: segment.video.id,
+        videoName: segment.video.name,
+        videoEventId: segment.video.event.id,
+        startTime: 0,
+        endTime: fullDuration,
+        duration: fullDuration,
+        order: index,
+      };
+    });
+
+    setSourceSegments(newSourceSegments);
+    setTimelineSegments(newTimelineSegments);
+    lastAppliedSeedRef.current = seedId;
+    toast({
+      title: 'Loaded for rehab',
+      description:
+        seededSourceVideos.length > 0
+          ? `Loaded ${seededSourceVideos.length} source videos from seeded remix`
+          : 'Loaded seeded video as source',
+    });
+  }, [
+    seedId,
+    seededVideo,
+    isSeedLoading,
+    seedSourceIds.length,
+    isSeedSourcesLoading,
+    seededSourceVideos,
+    setSourceSegments,
+    setTimelineSegments,
+    toast,
+  ]);
 
   const handleAddSourceVideo = () => setIsPickerOpen(true);
 
