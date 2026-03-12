@@ -19,6 +19,7 @@ import { useDVMJob } from '@/hooks/useDVMJob';
 import { useVideoEventsById } from '@/hooks/useBrainrotVideos';
 import { useDvmRelays } from '@/contexts/DvmRelaysContext';
 import { DEFAULT_BLOSSOM_UPLOAD_URL, DEFAULT_DVM_PUBKEY, DVM_RELAYS } from '@/lib/dvmRelays';
+import { parseRemixSegmentTags } from '@/lib/remixSegments';
 import type { NostrEvent } from '@nostrify/nostrify';
 import type { Video, SourceVideo, TimelineSegment, RemixData } from '@/types/video';
 
@@ -55,9 +56,16 @@ export default function RehabPage() {
   const sourceVideos = sourceSegments.map((s) => s.video);
   const { data: seedVideos = [], isLoading: isSeedLoading } = useVideoEventsById(seedId ? [seedId] : []);
   const seededVideo = seedVideos[0];
+  const seedSegmentMetas = useMemo(
+    () => (seededVideo ? parseRemixSegmentTags(seededVideo.event.tags) : []),
+    [seededVideo]
+  );
 
   const seedSourceIds = useMemo(() => {
     if (!seededVideo) return [];
+    if (seedSegmentMetas.length > 0) {
+      return [...new Set(seedSegmentMetas.map((segment) => segment.eventId))];
+    }
     const mentionIds = seededVideo.event.tags
       .filter(([name, value, _relay, marker]) => name === 'e' && Boolean(value) && marker === 'mention')
       .map(([, value]) => value)
@@ -68,7 +76,7 @@ export default function RehabPage() {
       .filter(Boolean);
     const ids = mentionIds.length > 0 ? mentionIds : fallbackIds;
     return [...new Set(ids)];
-  }, [seededVideo]);
+  }, [seededVideo, seedSegmentMetas]);
 
   const {
     data: seededSourceVideos = [],
@@ -84,21 +92,45 @@ export default function RehabPage() {
     if (lastAppliedSeedRef.current === seedId) return;
     if (seedSourceIds.length > 0 && isSeedSourcesLoading) return;
 
-    const baseVideos = seededSourceVideos.length > 0 ? seededSourceVideos : [seededVideo];
-    const newSourceSegments = baseVideos.map((video) => ({
-      id: crypto.randomUUID(),
-      video: { ...video, segments: [] },
-    }));
+    const resolvedById = new Map<string, Video>();
+    for (const video of seededSourceVideos) resolvedById.set(video.id, video);
+
+    const hasStructuredSegments = seedSegmentMetas.length > 0;
+    const newSourceSegments = hasStructuredSegments
+      ? seedSegmentMetas
+          .map((segmentMeta) => {
+            const video = resolvedById.get(segmentMeta.eventId);
+            if (!video) return null;
+            return {
+              id: crypto.randomUUID(),
+              video: { ...video, segments: [] },
+              startTime: segmentMeta.startTime,
+              endTime: segmentMeta.endTime,
+            };
+          })
+          .filter(Boolean) as Array<{ id: string; video: SourceVideo; startTime: number; endTime: number }>
+      : (seededSourceVideos.length > 0 ? seededSourceVideos : [seededVideo]).map((video) => ({
+          id: crypto.randomUUID(),
+          video: { ...video, segments: [] },
+          startTime: 0,
+          endTime: video.duration || 0,
+        }));
+
+    if (newSourceSegments.length === 0) return;
+
     const newTimelineSegments = newSourceSegments.map((segment, index) => {
-      const fullDuration = segment.video.duration || 0;
+      const maxEnd = segment.video.duration > 0 ? segment.video.duration : segment.endTime;
+      const safeStart = Math.max(0, segment.startTime);
+      const safeEnd = Math.max(safeStart, Math.min(segment.endTime, maxEnd || segment.endTime));
+      const duration = Math.max(0, safeEnd - safeStart);
       return {
         id: segment.id,
         sourceVideoId: segment.video.id,
         videoName: segment.video.name,
         videoEventId: segment.video.event.id,
-        startTime: 0,
-        endTime: fullDuration,
-        duration: fullDuration,
+        startTime: safeStart,
+        endTime: safeEnd,
+        duration,
         order: index,
       };
     });
@@ -109,8 +141,10 @@ export default function RehabPage() {
     toast({
       title: 'Loaded for rehab',
       description:
-        seededSourceVideos.length > 0
-          ? `Loaded ${seededSourceVideos.length} source videos from seeded remix`
+        hasStructuredSegments
+          ? `Loaded ${newSourceSegments.length} original remix segments`
+          : seededSourceVideos.length > 0
+            ? `Loaded ${seededSourceVideos.length} source videos from seeded remix`
           : 'Loaded seeded video as source',
     });
   }, [
@@ -118,6 +152,7 @@ export default function RehabPage() {
     seededVideo,
     isSeedLoading,
     seedSourceIds.length,
+    seedSegmentMetas,
     isSeedSourcesLoading,
     seededSourceVideos,
     setSourceSegments,

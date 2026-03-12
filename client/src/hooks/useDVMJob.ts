@@ -3,6 +3,7 @@ import { useNostr } from '@nostrify/react';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { useToast } from '@/hooks/useToast';
 import { BRAINROT_CLIENT_TAG } from '@/lib/dvmRelays';
+import { buildRemixSegmentTags, REMIX_SEGMENT_TAG, type RemixSegmentMeta } from '@/lib/remixSegments';
 import type { NostrEvent } from '@nostrify/nostrify';
 
 interface DVMTask {
@@ -59,7 +60,7 @@ export function useDVMJob(dvmPubkey: string, relays: string[]) {
   const isProcessing = useRef<boolean>(false);
   const eventQueue = useRef<NostrEvent[]>([]);
   // Store caption from broadcast - client is source of truth (DVM may not pass it through)
-  const lastBroadcastRef = useRef<{ caption?: string }>({});
+  const lastBroadcastRef = useRef<{ caption?: string; segments?: RemixSegmentMeta[] }>({});
 
   // Subscribe to task events
   useEffect(() => {
@@ -152,13 +153,19 @@ export function useDVMJob(dvmPubkey: string, relays: string[]) {
           
           setJobState({ status: 'awaiting_signature', currentTask: task });
           
-          let tags = (task.event.tags ?? []) as [string, string][];
+          let tags = (task.event.tags ?? []) as string[][];
           // CRITICAL: Kind 34236 is parameterized replaceable - without unique d tag, each video overwrites the last
           if (task.event.kind === 34236) {
             tags = tags.filter(([n]) => n !== 'd');
             tags = [['d', jobId], ...tags];
             if (!tags.some(([n]) => n === 'client')) {
               tags = [...tags, ['client', BRAINROT_CLIENT_TAG]];
+            }
+            // Persist remix structure so seeded rehab can reconstruct timeline later.
+            const segmentTags = buildRemixSegmentTags(lastBroadcastRef.current.segments ?? []);
+            tags = tags.filter(([n]) => n !== REMIX_SEGMENT_TAG);
+            if (segmentTags.length > 0) {
+              tags = [...tags, ...segmentTags];
             }
           }
           // Caption: use our stored value from broadcast (source of truth), fallback to DVM
@@ -300,7 +307,24 @@ export function useDVMJob(dvmPubkey: string, relays: string[]) {
         
         // Store caption for when we receive sign_event task (client is source of truth)
         const caption = (remixData as { caption?: string }).caption;
-        lastBroadcastRef.current = { caption };
+        const structuredSegments = (remixData as { segments?: Array<{
+          eventId?: string;
+          startTime: number;
+          endTime: number;
+          authorPubkey?: string;
+        }> }).segments ?? [];
+        lastBroadcastRef.current = {
+          caption,
+          segments: structuredSegments
+            .map((segment, index) => ({
+              order: index,
+              eventId: segment.eventId ?? '',
+              startTime: segment.startTime,
+              endTime: segment.endTime,
+              authorPubkey: segment.authorPubkey,
+            }))
+            .filter((segment) => Boolean(segment.eventId)),
+        };
         
         // Set job ID BEFORE publishing
         setCurrentJobId(signedEvent.id);
