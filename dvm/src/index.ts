@@ -38,7 +38,12 @@ const pool = new SimplePool()
 const startupTime = Math.floor(Date.now() / 1000)
 const filter = { kinds: [JOB_REQUEST_KIND], since: startupTime }
 
-log.info('Subscribing to job requests', { kind: JOB_REQUEST_KIND, relays: RELAYS, filter })
+log.info('Subscribing to job requests', {
+  kind: JOB_REQUEST_KIND,
+  relays: RELAYS,
+  filter,
+  startupTime,
+})
 
 const sub = pool.subscribe(RELAYS, filter, {
   onevent(ev: NostrEvent) {
