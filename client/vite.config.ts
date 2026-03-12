@@ -15,6 +15,7 @@ export default defineConfig(({ mode }) => {
   if (mode === "test") {
     if (!process.env.VITE_RELAYS) process.env.VITE_RELAYS = "wss://test.relay";
     if (!process.env.VITE_BLOSSOM_UPLOAD_URL) process.env.VITE_BLOSSOM_UPLOAD_URL = "https://test.blossom/upload";
+    if (!process.env.VITE_DVM_PUBKEY) process.env.VITE_DVM_PUBKEY = "0000000000000000000000000000000000000000000000000000000000000000";
   }
   return {
   server: {

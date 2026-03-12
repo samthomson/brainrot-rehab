@@ -109,7 +109,10 @@ export function useDVMJob(dvmPubkey: string, relays: string[]) {
         }
         
         if (task.type === 'sign_blossom') {
-          if (!user || !task.url || !task.payload_hash || task.size == null || task.expiration == null) return;
+          if (!user || !task.url || !task.payload_hash || task.size == null || task.expiration == null) {
+            console.error('[DVM] sign_blossom: missing required fields', { hasUser: !!user, url: task.url, hash: task.payload_hash, size: task.size, exp: task.expiration });
+            return;
+          }
           
           setJobState({ status: 'awaiting_blossom', currentTask: task });
           
@@ -135,12 +138,17 @@ export function useDVMJob(dvmPubkey: string, relays: string[]) {
             created_at: Math.floor(Date.now() / 1000),
           });
 
+          console.log('[DVM] Publishing blossom auth response (kind 30535) to', relays);
           await publishToPool(nostr, relays, responseEvent);
+          console.log('[DVM] Blossom auth response published successfully');
           setJobState({ status: 'uploading', currentTask: task });
           toast({ title: 'Upload Authorized', description: 'DVM is now uploading your video...' });
           
         } else if (task.type === 'sign_event') {
-          if (!user || !task.event) return;
+          if (!user || !task.event) {
+            console.error('[DVM] sign_event: missing required fields', { hasUser: !!user, hasEvent: !!task.event });
+            return;
+          }
           
           setJobState({ status: 'awaiting_signature', currentTask: task });
           
@@ -177,7 +185,9 @@ export function useDVMJob(dvmPubkey: string, relays: string[]) {
             created_at: Math.floor(Date.now() / 1000),
           });
 
+          console.log('[DVM] Publishing sign_event response (kind 30535) to', relays);
           await publishToPool(nostr, relays, responseEvent);
+          console.log('[DVM] Sign event response published successfully');
           setJobState({ status: 'pending', currentTask: task });
           toast({ title: 'Video Published!', description: 'Your remix is now on Nostr' });
         }
@@ -208,16 +218,26 @@ export function useDVMJob(dvmPubkey: string, relays: string[]) {
       }
     };
 
+    console.log('[DVM] Subscribing to task events', { jobId, dvmPubkey, relays, filter });
+
     relays.forEach((url) => {
       const relay = nostr.relay(url);
       const sub = relay.req([filter], { signal });
       (async () => {
         try {
           for await (const msg of sub) {
-            if (msg[0] === 'EVENT') handleEvent(msg[2]);
+            if (msg[0] === 'EOSE') {
+              console.log('[DVM] EOSE received from', url);
+            }
+            if (msg[0] === 'EVENT') {
+              console.log('[DVM] Received event from', url, { kind: msg[2].kind, id: msg[2].id, type: JSON.parse(msg[2].content).type });
+              handleEvent(msg[2]);
+            }
           }
-        } catch (_) {
-          // Aborted or relay closed
+        } catch (err) {
+          if (!signal.aborted) {
+            console.error('[DVM] Subscription error on', url, err);
+          }
         }
       })();
     });

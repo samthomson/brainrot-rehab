@@ -35,7 +35,15 @@ function parseBlossomUrl(): string {
 
 export const DEFAULT_BLOSSOM_UPLOAD_URL = parseBlossomUrl();
 
-/** DVM public key (64 hex). From VITE_DVM_PUBKEY. */
-export const DEFAULT_DVM_PUBKEY = (_env.VITE_DVM_PUBKEY as string | undefined)?.trim() ?? '';
+/** DVM public key (64 hex). From VITE_DVM_PUBKEY. Required. */
+function parseDvmPubkey(): string {
+  const raw = (_env.VITE_DVM_PUBKEY as string | undefined)?.trim();
+  if (!raw) throw new Error('VITE_DVM_PUBKEY env is required');
+  return raw;
+}
+
+export const DEFAULT_DVM_PUBKEY = parseDvmPubkey();
 
 export const BRAINROT_CLIENT_TAG = 'brainrot.rehab';
+
+console.log('[brainrot-config]', { DVM_RELAYS, DEFAULT_DVM_PUBKEY, DEFAULT_BLOSSOM_UPLOAD_URL });
