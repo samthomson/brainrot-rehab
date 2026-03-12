@@ -429,7 +429,7 @@ export function VideoLightbox({ video, open, onOpenChange }: VideoLightboxProps)
                   <span className="text-xs">Repost</span>
                 </Button>
                 <Button
-                  variant="ghost"
+                  variant={isFavorite ? 'default' : 'outline'}
                   size="sm"
                   disabled={isTogglingFavorite}
                   onClick={async () => {
@@ -448,9 +448,10 @@ export function VideoLightbox({ video, open, onOpenChange }: VideoLightboxProps)
                     }
                   }}
                   className="gap-1.5 h-8"
+                  title={isFavorite ? 'Remove from favorites' : 'Save to favorites'}
                 >
                   <Bookmark className={`h-4 w-4 ${isFavorite ? 'fill-current text-primary' : ''}`} />
-                  <span className="text-xs">{isFavorite ? 'Saved' : 'Save'}</span>
+                  <span className="text-xs">{isFavorite ? 'Saved to Favorites' : 'Save to Favorites'}</span>
                 </Button>
                 <Button
                   variant="ghost"
