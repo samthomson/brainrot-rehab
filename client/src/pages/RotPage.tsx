@@ -1,11 +1,11 @@
-import { useState } from 'react';
 import { useSeoMeta } from '@unhead/react';
 import { VideoCard } from '@/components/VideoCard';
 import { VideoLightbox } from '@/components/VideoLightbox';
-import { useBrainrotVideos } from '@/hooks/useBrainrotVideos';
+import { useBrainrotVideos, useVideoEventsById } from '@/hooks/useBrainrotVideos';
 import { useFavoriteVideos } from '@/hooks/useFavorites';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import { decodeVideoRef, encodeVideoRef } from '@/lib/videoRefs';
 import type { Video } from '@/types/video';
 
 export default function RotPage() {
@@ -16,7 +16,12 @@ export default function RotPage() {
 
   const { data: videos = [], isLoading, isError } = useBrainrotVideos();
   const { favoriteIdSet, toggleFavorite, isTogglingFavorite } = useFavoriteVideos();
-  const [lightboxVideo, setLightboxVideo] = useState<Video | null>(null);
+  const navigate = useNavigate();
+  const { videoId } = useParams<{ videoId?: string }>();
+  const lightboxId = decodeVideoRef(videoId);
+  const listedVideo = videos.find((video) => video.id === lightboxId) || null;
+  const { data: linkedVideos = [] } = useVideoEventsById(lightboxId && !listedVideo ? [lightboxId] : []);
+  const lightboxVideo: Video | null = listedVideo || linkedVideos[0] || null;
 
   return (
     <div className="max-w-5xl mx-auto p-6 space-y-6">
@@ -50,7 +55,9 @@ export default function RotPage() {
               <VideoCard
                 key={video.id}
                 video={video}
-                onClick={() => setLightboxVideo(video)}
+                onClick={() => {
+                  navigate(`/rot/${encodeVideoRef(video)}`);
+                }}
                 isFavorite={favoriteIdSet.has(video.id)}
                 onToggleFavorite={toggleFavorite}
                 isTogglingFavorite={isTogglingFavorite}
@@ -61,8 +68,12 @@ export default function RotPage() {
 
         <VideoLightbox
           video={lightboxVideo}
-          open={!!lightboxVideo}
-          onOpenChange={(open) => { if (!open) setLightboxVideo(null); }}
+          open={Boolean(lightboxId && lightboxVideo)}
+          onOpenChange={(open) => {
+            if (!open) {
+              navigate('/rot');
+            }
+          }}
         />
     </div>
   );

@@ -16,9 +16,11 @@ export function AppRouter() {
         <Route path="/" element={<BrainrotLayout />}>
           <Route index element={<Navigate to="/rot" replace />} />
           <Route path="rot" element={<RotPage />} />
+          <Route path="rot/:videoId" element={<RotPage />} />
           <Route path="rehab" element={<RehabPage />} />
           <Route path="rehab/:seedId" element={<RehabPage />} />
           <Route path="profile/:npub" element={<ProfilePage />} />
+          <Route path="profile/:npub/:videoId" element={<ProfilePage />} />
         </Route>
         {/* NIP-19 route for npub1, note1, naddr1, nevent1, nprofile1 */}
         <Route path="/:nip19" element={<NIP19Page />} />

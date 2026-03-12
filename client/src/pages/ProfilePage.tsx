@@ -1,10 +1,9 @@
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { nip19 } from 'nostr-tools';
 import { useAuthor } from '@/hooks/useAuthor';
-import { useMyBrainrotVideos } from '@/hooks/useBrainrotVideos';
+import { useMyBrainrotVideos, useVideoEventsById } from '@/hooks/useBrainrotVideos';
 import { VideoCard } from '@/components/VideoCard';
 import { VideoLightbox } from '@/components/VideoLightbox';
-import { useState } from 'react';
 import type { Video } from '@/types/video';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
@@ -13,11 +12,13 @@ import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { useIsFollowing, useToggleFollow } from '@/hooks/useFollow';
 import { useToast } from '@/hooks/useToast';
 import { useFavoriteVideos } from '@/hooks/useFavorites';
+import { decodeVideoRef, encodeVideoRef } from '@/lib/videoRefs';
 import { Link } from 'react-router-dom';
 
 export default function ProfilePage() {
-  const { npub } = useParams<{ npub: string }>();
-  const [lightboxVideo, setLightboxVideo] = useState<Video | null>(null);
+  const navigate = useNavigate();
+  const { npub, videoId } = useParams<{ npub: string; videoId?: string }>();
+  const lightboxId = decodeVideoRef(videoId);
   const { user } = useCurrentUser();
   const { favoriteIdSet, toggleFavorite, isTogglingFavorite } = useFavoriteVideos();
   const { toast } = useToast();
@@ -41,6 +42,9 @@ export default function ProfilePage() {
 
   const { data: author, isLoading: authorLoading } = useAuthor(pubkey || '');
   const { data: videos = [], isLoading: videosLoading } = useMyBrainrotVideos(pubkey);
+  const listedVideo = videos.find((video) => video.id === lightboxId) || null;
+  const { data: linkedVideos = [] } = useVideoEventsById(lightboxId && !listedVideo ? [lightboxId] : []);
+  const lightboxVideo: Video | null = listedVideo || linkedVideos[0] || null;
   const isFollowing = useIsFollowing(pubkey || '');
   const { mutateAsync: toggleFollow, isPending: isTogglingFollow } = useToggleFollow();
 
@@ -168,7 +172,9 @@ export default function ProfilePage() {
                 <VideoCard
                   key={video.id}
                   video={video}
-                  onClick={() => setLightboxVideo(video)}
+                  onClick={() => {
+                    navigate(`/profile/${npub}/${encodeVideoRef(video)}`);
+                  }}
                   isFavorite={favoriteIdSet.has(video.id)}
                   onToggleFavorite={toggleFavorite}
                   isTogglingFavorite={isTogglingFavorite}
@@ -181,9 +187,11 @@ export default function ProfilePage() {
 
       <VideoLightbox
         video={lightboxVideo}
-        open={!!lightboxVideo}
+        open={Boolean(lightboxId && lightboxVideo)}
         onOpenChange={(open) => {
-          if (!open) setLightboxVideo(null);
+          if (!open) {
+            navigate(`/profile/${npub}`);
+          }
         }}
       />
     </div>
