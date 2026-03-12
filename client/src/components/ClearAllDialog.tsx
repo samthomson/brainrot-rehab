@@ -22,7 +22,7 @@ export function ClearAllDialog({ open, onOpenChange, onConfirm }: ClearAllDialog
         <AlertDialogHeader>
           <AlertDialogTitle>Clear Everything?</AlertDialogTitle>
           <AlertDialogDescription>
-            This will remove all source videos, segments, and timeline data. This action cannot be undone.
+            This will remove all ingredients, segments, and timeline data. This action cannot be undone.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

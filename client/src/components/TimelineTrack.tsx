@@ -139,7 +139,7 @@ export function TimelineTrack({ segments, sourceVideos, onReorder, onRemove }: T
           <div className="text-center text-muted-foreground py-12">
             <p className="mb-2">Your timeline is empty</p>
             <p className="text-sm">
-              Cut segments from source videos above to build your remix
+              Cut segments from ingredients above to build your remix
             </p>
           </div>
         </CardContent>

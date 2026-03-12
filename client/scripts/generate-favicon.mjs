@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * Generates a green-tinted favicon from public/logo.png (TV logo).
- * Primary green: hsl(132, 100%, 32%) ≈ rgb(0, 81, 27)
+ * Generates a neon green favicon from public/logo.png (TV logo).
+ * Neon green: rgb(57, 255, 20)
  * Writes public/favicon.png for use as the tab icon.
  */
 import sharp from 'sharp';
@@ -19,7 +19,7 @@ if (!existsSync(logoPath)) {
   process.exit(1);
 }
 
-const primaryGreen = { r: 0, g: 81, b: 27 };
+const primaryGreen = { r: 57, g: 255, b: 20 };
 
 const image = sharp(logoPath);
 const meta = await image.metadata();
@@ -42,4 +42,4 @@ await sharp(out, { raw: { width: w, height: h, channels: 4 } })
   .png()
   .toFile(outPath);
 
-console.log('Wrote public/favicon.png (green TV logo)');
+console.log('Wrote public/favicon.png (neon green TV logo)');

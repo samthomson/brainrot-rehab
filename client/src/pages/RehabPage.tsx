@@ -144,7 +144,7 @@ export default function RehabPage() {
         hasStructuredSegments
           ? `Loaded ${newSourceSegments.length} original remix segments`
           : seededSourceVideos.length > 0
-            ? `Loaded ${seededSourceVideos.length} source videos from seeded remix`
+            ? `Loaded ${seededSourceVideos.length} ingredients from seeded remix`
           : 'Loaded seeded video as source',
     });
   }, [

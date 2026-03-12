@@ -278,14 +278,12 @@ Compose: `docker-compose.prod.yml`.
 ## todo
 
 - [ ] progress sections for publishing
-	- [ ] icons are dumb too
-	- [ ] and it jumps back to [20?]% before finishing
+	- [ ] improve status icons
+	- [ ] fix progress bar jumping backward near completion
 - [ ] some kind of drafts/published ui
 - [ ] zap splits?
 - [ ] support deleting own content
 
-- [ ] highlight brainrot in ui for adding videos
-- [ ] neon green favicon
-- [ ] use an existing brainrot as a template
-- [ ] cahnge source videos to 'ingredients' or somethign more fun
+- [x] neon green favicon
+- [x] rename source videos to ingredients
 - [ ] outbox

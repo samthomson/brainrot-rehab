@@ -120,14 +120,14 @@ export function SourceVideosList({
   if (sourceSegments.length === 0) {
     return (
       <div>
-        <h2 className="text-xl font-bold mb-4">Source Videos (0)</h2>
+        <h2 className="text-xl font-bold mb-4">Ingredients (0)</h2>
         <Card className="border-dashed border-2 hover:border-primary/50 transition-colors">
           <CardContent className="py-20 text-center">
             <Button onClick={onAddSourceVideo} size="lg" className="h-24 w-24 rounded-full">
               <Plus className="h-12 w-12" />
             </Button>
             <p className="text-sm text-muted-foreground mt-4">
-              Add your first video
+              Add your first ingredient
             </p>
           </CardContent>
         </Card>
@@ -138,7 +138,7 @@ export function SourceVideosList({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold">Source Videos ({sourceSegments.length})</h2>
+        <h2 className="text-xl font-bold">Ingredients ({sourceSegments.length})</h2>
         {showClearButton && (
           <Button
             variant="outline"

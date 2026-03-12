@@ -17,7 +17,7 @@ import { ZapDialog } from '@/components/ZapDialog';
 import { useIsFollowing, useToggleFollow } from '@/hooks/useFollow';
 import { UserPlus, UserMinus, Copy } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
-import { Heart, Repeat2, MessageSquare, Send, Zap, Play, Pause, Bookmark } from 'lucide-react';
+import { Heart, Repeat2, MessageSquare, Send, Zap, Play, Pause, Bookmark, Scissors } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { nip19 } from 'nostr-tools';
 import { Link, useNavigate } from 'react-router-dom';
@@ -430,7 +430,7 @@ export function VideoLightbox({ video, open, onOpenChange }: VideoLightboxProps)
                   <span className="text-xs">Repost</span>
                 </Button>
                 <Button
-                  variant="ghost"
+                  variant="default"
                   size="sm"
                   onClick={() => {
                     onOpenChange(false);
@@ -439,7 +439,8 @@ export function VideoLightbox({ video, open, onOpenChange }: VideoLightboxProps)
                   className="gap-1.5 h-8"
                   title="Open this video in Rehab"
                 >
-                  <span className="text-xs">Rehab</span>
+                  <Scissors className="h-4 w-4" />
+                  <span className="text-xs font-semibold">Rehab</span>
                 </Button>
                 <Button
                   variant={isFavorite ? 'default' : 'outline'}
@@ -500,11 +501,11 @@ export function VideoLightbox({ video, open, onOpenChange }: VideoLightboxProps)
                 </Button>
               </div>
 
-              {/* Source videos */}
+              {/* Ingredients */}
               {hasSources && (
                 <div className="border-t border-border pt-6 mt-2">
                   <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide mb-3">
-                    Source videos ({sourceRefs.length})
+                    Ingredients ({sourceRefs.length})
                   </h3>
                   <div className="space-y-3">
                     {sourcesLoading ? (
