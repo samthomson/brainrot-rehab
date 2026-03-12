@@ -12,6 +12,7 @@ import { usePersistedState } from '@/hooks/usePersistedState';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/useToast';
 import { BroadcastButton } from '@/components/BroadcastButton';
 import { DVMJobStatus } from '@/components/DVMJobStatus';
@@ -351,23 +352,31 @@ export default function RehabPage() {
               />
               {timelineSegments.length > 0 && (
                 <div className="space-y-4 pt-2">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="caption" className="text-sm font-semibold">Caption</Label>
-                    <Input
-                      id="caption"
-                      placeholder="Add a caption for your video..."
-                      value={caption}
-                      onChange={(e) => setCaption(e.target.value)}
-                    />
-                  </div>
-                  <BroadcastButton
-                    remixData={remixDataSlim}
-                    onBroadcast={() => broadcastJob(remixDataSlim)}
-                    disabled={jobState.status !== 'idle' && jobState.status !== 'error'}
-                    isLoading={jobState.status === 'broadcasting'}
-                    label="Publish"
-                    loadingLabel="Publishing..."
-                  />
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base">Publish</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="space-y-1.5">
+                        <Label htmlFor="caption" className="text-sm font-semibold">Caption</Label>
+                        <Input
+                          id="caption"
+                          placeholder="Add a caption for your video..."
+                          value={caption}
+                          onChange={(e) => setCaption(e.target.value)}
+                        />
+                      </div>
+                      <BroadcastButton
+                        remixData={remixDataSlim}
+                        onBroadcast={() => broadcastJob(remixDataSlim)}
+                        disabled={jobState.status !== 'idle' && jobState.status !== 'error'}
+                        isLoading={jobState.status === 'broadcasting'}
+                        label="Publish"
+                        loadingLabel="Publishing..."
+                      />
+                    </CardContent>
+                  </Card>
+
                   <DVMJobStatus
                     status={jobState.status}
                     currentTask={jobState.currentTask}
@@ -375,7 +384,7 @@ export default function RehabPage() {
                     errorMessage={jobState.errorMessage}
                     onReset={resetJob}
                   />
-                </div>
+                  </div>
               )}
             </div>
             <Dialog open={payloadJsonOpen} onOpenChange={setPayloadJsonOpen}>

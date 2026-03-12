@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, CheckCircle, XCircle, Upload, FileSignature, Radio, X } from 'lucide-react';
-import { Progress } from '@/components/ui/progress';
+import { Loader2, CheckCircle2, Circle, XCircle, X } from 'lucide-react';
 
 const PENDING_STALE_MS = 90_000;
 
@@ -18,14 +17,14 @@ interface DVMJobStatusProps {
 }
 
 const STATUS_CONFIG = {
-  idle: { label: 'Ready', icon: Radio, color: 'text-muted-foreground', progress: 0 },
-  broadcasting: { label: 'Broadcasting...', icon: Loader2, color: 'text-blue-500', progress: 10 },
-  pending: { label: 'Waiting for DVM...', icon: Loader2, color: 'text-blue-500', progress: 20 },
-  awaiting_blossom: { label: 'Needs Upload Auth', icon: FileSignature, color: 'text-yellow-500', progress: 40 },
-  uploading: { label: 'Uploading Video...', icon: Upload, color: 'text-blue-500', progress: 60 },
-  awaiting_signature: { label: 'Needs Video Signature', icon: FileSignature, color: 'text-yellow-500', progress: 80 },
-  complete: { label: 'Complete!', icon: CheckCircle, color: 'text-green-500', progress: 100 },
-  error: { label: 'Failed', icon: XCircle, color: 'text-red-500', progress: 0 },
+  idle: { label: 'Ready' },
+  broadcasting: { label: 'Broadcasting job...' },
+  pending: { label: 'Waiting for DVM...' },
+  awaiting_blossom: { label: 'Awaiting upload authorization' },
+  uploading: { label: 'Uploading composed video...' },
+  awaiting_signature: { label: 'Awaiting final publish signature' },
+  complete: { label: 'Published' },
+  error: { label: 'Failed' },
 };
 
 export function DVMJobStatus({ status, currentTask, resultEventId, errorMessage, onReset }: DVMJobStatusProps) {
@@ -43,15 +42,44 @@ export function DVMJobStatus({ status, currentTask, resultEventId, errorMessage,
   if (status === 'idle') return null;
 
   const config = STATUS_CONFIG[status];
-  const Icon = config.icon;
+  const steps = [
+    'Job sent to relay',
+    'DVM picked up request',
+    'Authorize upload',
+    'DVM uploads video',
+    'Sign final event',
+    'Done',
+  ] as const;
+
+  const activeStep = (() => {
+    switch (status) {
+      case 'broadcasting':
+        return 0;
+      case 'pending':
+        return 1;
+      case 'awaiting_blossom':
+        return 2;
+      case 'uploading':
+        return 3;
+      case 'awaiting_signature':
+        return 4;
+      case 'complete':
+        return 5;
+      case 'error':
+        if (currentTask?.type === 'sign_event') return 4;
+        if (currentTask?.type === 'sign_blossom') return 2;
+        return 1;
+      default:
+        return 0;
+    }
+  })();
 
   return (
     <Card className="border-primary/50">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-base flex items-center gap-2">
-            <Icon className={`h-5 w-5 ${config.color} ${status === 'broadcasting' || status === 'pending' || status === 'uploading' ? 'animate-spin' : ''}`} />
-            DVM Job Status
+          <CardTitle className="text-base">
+            Publish Checklist
           </CardTitle>
           {(status === 'complete' || status === 'error') && (
             <Button variant="ghost" size="icon" onClick={onReset}>
@@ -61,12 +89,32 @@ export function DVMJobStatus({ status, currentTask, resultEventId, errorMessage,
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
-        <div>
-          <div className="flex justify-between text-sm mb-2">
-            <span className={`font-medium ${config.color}`}>{config.label}</span>
-            <span className="text-muted-foreground">{config.progress}%</span>
-          </div>
-          <Progress value={config.progress} className="h-2" />
+        <p className={`text-sm font-medium ${status === 'error' ? 'text-destructive' : 'text-primary'}`}>
+          {config.label}
+        </p>
+
+        <div className="space-y-2">
+          {steps.map((step, index) => {
+            const isDone = status === 'complete' ? true : index < activeStep;
+            const isActive = status !== 'complete' && index === activeStep;
+            const isError = status === 'error' && index === activeStep;
+            return (
+              <div key={step} className="flex items-center gap-2 text-sm">
+                {isDone ? (
+                  <CheckCircle2 className="h-4 w-4 text-primary" />
+                ) : isError ? (
+                  <XCircle className="h-4 w-4 text-destructive" />
+                ) : isActive ? (
+                  <Loader2 className="h-4 w-4 text-primary animate-spin" />
+                ) : (
+                  <Circle className="h-4 w-4 text-muted-foreground/60" />
+                )}
+                <span className={isDone ? 'text-foreground' : isActive ? 'text-foreground font-medium' : 'text-muted-foreground'}>
+                  {step}
+                </span>
+              </div>
+            );
+          })}
         </div>
 
         {currentTask?.message && (
