@@ -5,6 +5,8 @@ import { Button } from '@/components/ui/button';
 import { formatDistanceToNow } from 'date-fns';
 import { useVideoAuthor } from '@/hooks/useVideoAuthor';
 import { useToast } from '@/hooks/useToast';
+import { BRAINROT_CLIENT_TAG } from '@/lib/dvmRelays';
+import { cn } from '@/lib/utils';
 import type { Video } from '@/types/video';
 
 interface VideoCardProps {
@@ -40,6 +42,8 @@ export const VideoCard = memo(function VideoCard({
   const thumbnailVideoRef = useRef<HTMLVideoElement>(null);
   const inlineVideoRef = useRef<HTMLVideoElement>(null);
   const { toast } = useToast();
+  const clientTag = video.event.tags.find(([name]) => name === 'client')?.[1];
+  const isBrainrotPublished = clientTag === BRAINROT_CLIENT_TAG;
 
   useEffect(() => {
     if (!video.thumbnailUrl && !generatedThumbnail && thumbnailVideoRef.current) {
@@ -138,11 +142,17 @@ export const VideoCard = memo(function VideoCard({
 
   return (
     <Card
-      className="cursor-pointer transition-all hover:scale-[1.03] hover:shadow-lg group"
+      className={cn(
+        'cursor-pointer transition-all hover:scale-[1.03] hover:shadow-lg group',
+        isBrainrotPublished && 'bg-primary text-primary-foreground border-primary/40'
+      )}
       onClick={handleCardClick}
     >
       <CardContent className="p-0">
-        <div className="relative aspect-[9/16] bg-muted overflow-hidden rounded-t">
+        <div className={cn(
+          'relative aspect-[9/16] bg-muted overflow-hidden rounded-t',
+          isBrainrotPublished && 'bg-primary/80'
+        )}>
           {showInlinePlayer ? (
             <>
               <video
@@ -278,10 +288,16 @@ export const VideoCard = memo(function VideoCard({
           <p className="font-medium text-sm truncate mb-1">
             {video.name}
           </p>
-          <p className="text-xs text-muted-foreground truncate">
+          <p className={cn(
+            'text-xs truncate',
+            isBrainrotPublished ? 'text-primary-foreground/90' : 'text-muted-foreground'
+          )}>
             {displayName}
           </p>
-          <p className="text-xs text-muted-foreground truncate">
+          <p className={cn(
+            'text-xs truncate',
+            isBrainrotPublished ? 'text-primary-foreground/80' : 'text-muted-foreground'
+          )}>
             {formatDate(video.publishedAt)}
           </p>
         </div>
