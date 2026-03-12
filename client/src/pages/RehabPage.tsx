@@ -37,8 +37,6 @@ export default function RehabPage() {
   const [timelineSegments, setTimelineSegments] = usePersistedState<TimelineSegment[]>('video-remix-timeline', []);
   const [blocklist, setBlocklist] = usePersistedState<string[]>('video-remix-blocklist', []);
   const { userSelectedWriteRelays } = useDvmRelays();
-  const [blossomUploadUrl] = usePersistedState<string>('video-remix-blossom-url', DEFAULT_BLOSSOM_UPLOAD_URL);
-  const [dvmPubkey] = usePersistedState<string>('video-remix-dvm-pubkey', DEFAULT_DVM_PUBKEY);
 
   const [caption, setCaption] = useState('');
   const [isPickerOpen, setIsPickerOpen] = useState(false);
@@ -46,7 +44,7 @@ export default function RehabPage() {
   const [isBlocklistOpen, setIsBlocklistOpen] = useState(false);
   const [payloadJsonOpen, setPayloadJsonOpen] = useState(false);
 
-  const { jobState, broadcastJob, resetJob } = useDVMJob(dvmPubkey, DVM_RELAYS);
+  const { jobState, broadcastJob, resetJob } = useDVMJob(DEFAULT_DVM_PUBKEY, DVM_RELAYS);
 
   const sourceVideos = sourceSegments.map((s) => s.video);
 
@@ -196,7 +194,7 @@ export default function RehabPage() {
         authorPubkey: sourceVideo?.pubkey || '',
       };
     }),
-    blossom_upload_url: blossomUploadUrl,
+    blossom_upload_url: DEFAULT_BLOSSOM_UPLOAD_URL,
     caption: caption.trim() || undefined,
     write_relays: userSelectedWriteRelays,
   };

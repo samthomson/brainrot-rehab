@@ -11,15 +11,11 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/useToast';
 import { usePersistedState } from '@/hooks/usePersistedState';
-import { DEFAULT_BLOSSOM_UPLOAD_URL, WRITE_RELAYS_OPTIONS } from '@/lib/dvmRelays';
+import { WRITE_RELAYS_OPTIONS } from '@/lib/dvmRelays';
 
 interface SettingsModalProps {
   open: boolean;
   onClose: () => void;
-  dvmPubkey: string;
-  onDvmPubkeyChange: (pubkey: string) => void;
-  blossomUploadUrl: string;
-  onBlossomUrlChange: (url: string) => void;
   userSelectedWriteRelays: string[];
   onUserSelectedWriteRelaysChange: (urls: string[]) => void;
 }
@@ -31,10 +27,6 @@ function stripScheme(url: string): string {
 export function SettingsModal({
   open,
   onClose,
-  dvmPubkey,
-  onDvmPubkeyChange,
-  blossomUploadUrl,
-  onBlossomUrlChange,
   userSelectedWriteRelays,
   onUserSelectedWriteRelaysChange,
 }: SettingsModalProps) {
@@ -73,14 +65,6 @@ export function SettingsModal({
   };
 
   const handleSave = () => {
-    if (dvmPubkey && dvmPubkey.length !== 64) {
-      toast({
-        title: 'Invalid Pubkey',
-        description: 'DVM pubkey must be 64 characters (hex)',
-        variant: 'destructive',
-      });
-      return;
-    }
     if (userSelectedWriteRelays.length === 0) {
       toast({
         title: 'At least one relay required',
@@ -102,31 +86,6 @@ export function SettingsModal({
 
         <div className="space-y-6">
           <div className="space-y-4">
-            <h4 className="font-semibold">DVM</h4>
-            <div className="space-y-2">
-              <Label htmlFor="dvm-pubkey">DVM Pubkey</Label>
-              <Input
-                id="dvm-pubkey"
-                placeholder="Enter DVM pubkey (64 char hex)..."
-                value={dvmPubkey}
-                onChange={(e) => onDvmPubkeyChange(e.target.value)}
-                className="font-mono text-sm"
-              />
-              <p className="text-xs text-muted-foreground">The pubkey of the DVM that processes your videos (default from build; you can override)</p>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="blossom-url">Blossom Upload URL</Label>
-              <Input
-                id="blossom-url"
-                placeholder={DEFAULT_BLOSSOM_UPLOAD_URL}
-                value={blossomUploadUrl}
-                onChange={(e) => onBlossomUrlChange(e.target.value)}
-              />
-              <p className="text-xs text-muted-foreground">Where the DVM uploads the final video</p>
-            </div>
-          </div>
-
-          <div className="space-y-4 pt-4 border-t">
             <h4 className="font-semibold">Publish video to</h4>
             <p className="text-xs text-muted-foreground">
               Relays where your finished video will be published. At least one required.

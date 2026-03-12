@@ -6,7 +6,7 @@ import { LoginArea } from '@/components/auth/LoginArea';
 import { SettingsModal } from '@/components/SettingsModal';
 import { DvmRelaysProvider } from '@/contexts/DvmRelaysContext';
 import { usePersistedState } from '@/hooks/usePersistedState';
-import { DEFAULT_BLOSSOM_UPLOAD_URL, DEFAULT_DVM_PUBKEY, DVM_RELAYS } from '@/lib/dvmRelays';
+import { DVM_RELAYS } from '@/lib/dvmRelays';
 
 const navItems = [
   { path: '/rot', label: 'Rot' },
@@ -17,8 +17,6 @@ export function BrainrotLayout() {
   const location = useLocation();
   const [settingsOpen, setSettingsOpen] = useState(false);
 
-  const [dvmPubkey, setDvmPubkey] = usePersistedState<string>('video-remix-dvm-pubkey', DEFAULT_DVM_PUBKEY);
-  const [blossomUploadUrl, setBlossomUploadUrl] = usePersistedState<string>('video-remix-blossom-url', DEFAULT_BLOSSOM_UPLOAD_URL);
   const [userSelectedWriteRelays, setUserSelectedWriteRelays] = usePersistedState<string[]>(
     'user-selected-write-relays',
     [DVM_RELAYS[0]]
@@ -69,10 +67,6 @@ export function BrainrotLayout() {
       <SettingsModal
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}
-        dvmPubkey={dvmPubkey}
-        onDvmPubkeyChange={setDvmPubkey}
-        blossomUploadUrl={blossomUploadUrl}
-        onBlossomUrlChange={setBlossomUploadUrl}
         userSelectedWriteRelays={userSelectedWriteRelays}
         onUserSelectedWriteRelaysChange={setUserSelectedWriteRelays}
       />
