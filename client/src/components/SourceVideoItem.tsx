@@ -44,6 +44,45 @@ export function SourceVideoItem({
   const [jsonCopied, setJsonCopied] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const updateTimeoutRef = useRef<NodeJS.Timeout>();
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const gainRef = useRef<GainNode | null>(null);
+  const sourceConnectedRef = useRef(false);
+
+  // Wire up Web Audio so we can schedule sample-accurate gain cutoff at endTime.
+  const ensureAudioGraph = useCallback(() => {
+    const v = videoRef.current;
+    if (!v || sourceConnectedRef.current) return;
+    try {
+      const ctx = new AudioContext();
+      const source = ctx.createMediaElementSource(v);
+      const gain = ctx.createGain();
+      source.connect(gain);
+      gain.connect(ctx.destination);
+      audioCtxRef.current = ctx;
+      gainRef.current = gain;
+      sourceConnectedRef.current = true;
+    } catch {
+      // Fallback: if Web Audio fails, playback still works through the element
+    }
+  }, []);
+
+  // Schedule gain to drop to 0 at exactly endTime on the audio clock.
+  const scheduleGainCutoff = useCallback(() => {
+    const v = videoRef.current;
+    const ctx = audioCtxRef.current;
+    const gain = gainRef.current;
+    if (!v || !ctx || !gain) return;
+
+    gain.gain.cancelScheduledValues(ctx.currentTime);
+    gain.gain.setValueAtTime(1, ctx.currentTime);
+
+    const timeUntilEnd = range[1] - v.currentTime;
+    if (timeUntilEnd > 0) {
+      const cutoffAt = ctx.currentTime + timeUntilEnd;
+      gain.gain.setValueAtTime(1, cutoffAt - 0.001);
+      gain.gain.linearRampToValueAtTime(0, cutoffAt);
+    }
+  }, [range]);
 
   const handleLoadedMetadata = useCallback(() => {
     if (videoRef.current) {
@@ -69,39 +108,29 @@ export function SourceVideoItem({
     }
   }, [initialStartTime, initialEndTime, hasInitialRange, segmentId, video.id, video.name, video.event.id, onSegmentChange]);
 
-  const MUTE_BEFORE_END = 0.12;
-
-  const enforceBoundary = useCallback(() => {
+  const handleTimeUpdate = useCallback(() => {
     const v = videoRef.current;
     if (!v) return;
     const time = v.currentTime;
     setCurrentTime(time);
 
     if (time >= range[1] || time < range[0]) {
-      v.muted = false;
       v.currentTime = range[0];
-      return;
+      scheduleGainCutoff();
     }
-    // Mute audio near the end so the browser's audio buffer overshoot is silent
-    v.muted = (range[1] - time) < MUTE_BEFORE_END;
-  }, [range]);
+  }, [range, scheduleGainCutoff]);
 
-  // RAF loop while playing — tightest boundary enforcement JS can do
+  // RAF loop for visual boundary enforcement
   useEffect(() => {
     if (!isPlaying) return;
     let raf: number;
     const tick = () => {
-      enforceBoundary();
+      handleTimeUpdate();
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [isPlaying, enforceBoundary]);
-
-  // Also handle the native timeupdate as fallback
-  const handleTimeUpdate = useCallback(() => {
-    enforceBoundary();
-  }, [enforceBoundary]);
+  }, [isPlaying, handleTimeUpdate]);
 
   const togglePlayPause = useCallback(() => {
     if (videoRef.current) {
@@ -110,13 +139,16 @@ export function SourceVideoItem({
         setIsPlaying(false);
         if (onPlayingChange) onPlayingChange(segmentId, false);
       } else {
+        ensureAudioGraph();
+        audioCtxRef.current?.resume();
         videoRef.current.currentTime = range[0];
         videoRef.current.play();
+        scheduleGainCutoff();
         setIsPlaying(true);
         if (onPlayingChange) onPlayingChange(segmentId, true);
       }
     }
-  }, [isPlaying, range, segmentId, onPlayingChange]);
+  }, [isPlaying, range, segmentId, onPlayingChange, ensureAudioGraph, scheduleGainCutoff]);
 
   // Auto-pause when another video starts playing
   useEffect(() => {

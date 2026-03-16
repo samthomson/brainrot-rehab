@@ -18,6 +18,42 @@ export function RemixPreview({ segments, sourceVideos, onPayloadJsonClick }: Rem
   const [totalProgress, setTotalProgress] = useState(0);
   const videoRef = useRef<HTMLVideoElement>(null);
   const preloadVideoRef = useRef<HTMLVideoElement>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const gainRef = useRef<GainNode | null>(null);
+  const sourceConnectedRef = useRef(false);
+
+  const ensureAudioGraph = useCallback(() => {
+    const v = videoRef.current;
+    if (!v || sourceConnectedRef.current) return;
+    try {
+      const ctx = new AudioContext();
+      const source = ctx.createMediaElementSource(v);
+      const gain = ctx.createGain();
+      source.connect(gain);
+      gain.connect(ctx.destination);
+      audioCtxRef.current = ctx;
+      gainRef.current = gain;
+      sourceConnectedRef.current = true;
+    } catch {
+      // Fallback: playback still works through the element
+    }
+  }, []);
+
+  const scheduleGainCutoff = useCallback((endTime: number, mediaCurrentTime: number) => {
+    const ctx = audioCtxRef.current;
+    const gain = gainRef.current;
+    if (!ctx || !gain) return;
+
+    gain.gain.cancelScheduledValues(ctx.currentTime);
+    gain.gain.setValueAtTime(1, ctx.currentTime);
+
+    const timeUntilEnd = endTime - mediaCurrentTime;
+    if (timeUntilEnd > 0) {
+      const cutoffAt = ctx.currentTime + timeUntilEnd;
+      gain.gain.setValueAtTime(1, cutoffAt - 0.001);
+      gain.gain.linearRampToValueAtTime(0, cutoffAt);
+    }
+  }, []);
 
   // Reset to first segment when segments or their order changes
   const segmentKey = segments.map((s) => s.id).join(',');
@@ -61,26 +97,27 @@ export function RemixPreview({ segments, sourceVideos, onPayloadJsonClick }: Rem
     if (videoRef.current && currentSegment && sourceVideo) {
       videoRef.current.src = sourceVideo.url;
       videoRef.current.currentTime = currentSegment.startTime;
-      
+
       if (isPlaying) {
-        videoRef.current.play().catch((err) => {
+        ensureAudioGraph();
+        audioCtxRef.current?.resume();
+        videoRef.current.play().then(() => {
+          scheduleGainCutoff(currentSegment.endTime, currentSegment.startTime);
+        }).catch((err) => {
           console.error('Error playing video:', err);
           setIsPlaying(false);
         });
       }
     }
-  }, [safeSegmentIndex, currentSegment, sourceVideo, isPlaying]);
+  }, [safeSegmentIndex, currentSegment, sourceVideo, isPlaying, ensureAudioGraph, scheduleGainCutoff]);
 
-  const MUTE_BEFORE_END = 0.12;
-
-  const enforceBoundary = useCallback(() => {
+  const handleTimeUpdate = useCallback(() => {
     const v = videoRef.current;
     if (!v || !currentSegment) return;
 
     const time = v.currentTime;
 
     if (time >= currentSegment.endTime) {
-      v.muted = false;
       if (safeSegmentIndex < segments.length - 1) {
         setCurrentSegmentIndex((prev) => Math.min(prev + 1, segments.length - 1));
       } else {
@@ -91,9 +128,6 @@ export function RemixPreview({ segments, sourceVideos, onPayloadJsonClick }: Rem
       }
       return;
     }
-
-    // Mute audio near the end so the browser's audio buffer overshoot is silent
-    v.muted = (currentSegment.endTime - time) < MUTE_BEFORE_END;
 
     const segmentElapsed = Math.max(0, time - currentSegment.startTime);
     const segmentProg = currentSegment.duration > 0 ? (segmentElapsed / currentSegment.duration) * 100 : 0;
@@ -106,21 +140,17 @@ export function RemixPreview({ segments, sourceVideos, onPayloadJsonClick }: Rem
     setTotalProgress(Math.min(totalProg, 100));
   }, [currentSegment, safeSegmentIndex, segments, totalDuration]);
 
-  // RAF loop while playing for tight boundary enforcement
+  // RAF loop for visual boundary + segment advancement
   useEffect(() => {
     if (!isPlaying || segments.length === 0) return;
     let raf: number;
     const tick = () => {
-      enforceBoundary();
+      handleTimeUpdate();
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [isPlaying, segments.length, enforceBoundary]);
-
-  const handleTimeUpdate = useCallback(() => {
-    enforceBoundary();
-  }, [enforceBoundary]);
+  }, [isPlaying, segments.length, handleTimeUpdate]);
 
   const togglePlayPause = () => {
     if (!videoRef.current) return;
@@ -129,9 +159,15 @@ export function RemixPreview({ segments, sourceVideos, onPayloadJsonClick }: Rem
       videoRef.current.pause();
       setIsPlaying(false);
     } else {
-      videoRef.current.play().catch((err) => {
-        console.error('Error playing video:', err);
-      });
+      ensureAudioGraph();
+      audioCtxRef.current?.resume();
+      if (currentSegment) {
+        videoRef.current.play().then(() => {
+          scheduleGainCutoff(currentSegment.endTime, videoRef.current!.currentTime);
+        }).catch((err) => {
+          console.error('Error playing video:', err);
+        });
+      }
       setIsPlaying(true);
     }
   };
