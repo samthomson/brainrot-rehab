@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, memo } from 'react';
+import { useState, useRef, useEffect, useCallback, memo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Play, Pause, SkipBack, SkipForward, Eye, HelpCircle } from 'lucide-react';
@@ -71,37 +71,56 @@ export function RemixPreview({ segments, sourceVideos, onPayloadJsonClick }: Rem
     }
   }, [safeSegmentIndex, currentSegment, sourceVideo, isPlaying]);
 
-  const handleTimeUpdate = () => {
-    if (!videoRef.current || !currentSegment) return;
+  const MUTE_BEFORE_END = 0.12;
 
-    const currentTime = videoRef.current.currentTime;
-    
-    // Check if we've reached the end of this segment
-    if (currentTime >= currentSegment.endTime) {
-      // Move to next segment
+  const enforceBoundary = useCallback(() => {
+    const v = videoRef.current;
+    if (!v || !currentSegment) return;
+
+    const time = v.currentTime;
+
+    if (time >= currentSegment.endTime) {
+      v.muted = false;
       if (safeSegmentIndex < segments.length - 1) {
         setCurrentSegmentIndex((prev) => Math.min(prev + 1, segments.length - 1));
       } else {
-        // End of timeline
         setIsPlaying(false);
         setCurrentSegmentIndex(0);
         setSegmentProgress(0);
         setTotalProgress(0);
       }
-    } else {
-      // Update progress within segment
-      const segmentElapsed = currentTime - currentSegment.startTime;
-      const segmentProg = (segmentElapsed / currentSegment.duration) * 100;
-      setSegmentProgress(segmentProg);
-
-      // Calculate total progress
-      const segmentsBefore = segments.slice(0, safeSegmentIndex);
-      const durationBefore = segmentsBefore.reduce((sum, seg) => sum + seg.duration, 0);
-      const totalElapsed = durationBefore + segmentElapsed;
-      const totalProg = (totalElapsed / totalDuration) * 100;
-      setTotalProgress(totalProg);
+      return;
     }
-  };
+
+    // Mute audio near the end so the browser's audio buffer overshoot is silent
+    v.muted = (currentSegment.endTime - time) < MUTE_BEFORE_END;
+
+    const segmentElapsed = Math.max(0, time - currentSegment.startTime);
+    const segmentProg = currentSegment.duration > 0 ? (segmentElapsed / currentSegment.duration) * 100 : 0;
+    setSegmentProgress(Math.min(segmentProg, 100));
+
+    const segmentsBefore = segments.slice(0, safeSegmentIndex);
+    const durationBefore = segmentsBefore.reduce((sum, seg) => sum + seg.duration, 0);
+    const totalElapsed = durationBefore + segmentElapsed;
+    const totalProg = totalDuration > 0 ? (totalElapsed / totalDuration) * 100 : 0;
+    setTotalProgress(Math.min(totalProg, 100));
+  }, [currentSegment, safeSegmentIndex, segments, totalDuration]);
+
+  // RAF loop while playing for tight boundary enforcement
+  useEffect(() => {
+    if (!isPlaying || segments.length === 0) return;
+    let raf: number;
+    const tick = () => {
+      enforceBoundary();
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [isPlaying, segments.length, enforceBoundary]);
+
+  const handleTimeUpdate = useCallback(() => {
+    enforceBoundary();
+  }, [enforceBoundary]);
 
   const togglePlayPause = () => {
     if (!videoRef.current) return;

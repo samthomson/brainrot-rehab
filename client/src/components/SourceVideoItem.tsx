@@ -69,19 +69,39 @@ export function SourceVideoItem({
     }
   }, [initialStartTime, initialEndTime, hasInitialRange, segmentId, video.id, video.name, video.event.id, onSegmentChange]);
 
-  const handleTimeUpdate = useCallback(() => {
-    if (videoRef.current) {
-      const time = videoRef.current.currentTime;
-      setCurrentTime(time);
+  const MUTE_BEFORE_END = 0.12;
 
-      if (isPlaying && time >= range[1]) {
-        videoRef.current.currentTime = range[0];
-      }
-      if (time < range[0] || time > range[1]) {
-        videoRef.current.currentTime = range[0];
-      }
+  const enforceBoundary = useCallback(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    const time = v.currentTime;
+    setCurrentTime(time);
+
+    if (time >= range[1] || time < range[0]) {
+      v.muted = false;
+      v.currentTime = range[0];
+      return;
     }
-  }, [isPlaying, range]);
+    // Mute audio near the end so the browser's audio buffer overshoot is silent
+    v.muted = (range[1] - time) < MUTE_BEFORE_END;
+  }, [range]);
+
+  // RAF loop while playing — tightest boundary enforcement JS can do
+  useEffect(() => {
+    if (!isPlaying) return;
+    let raf: number;
+    const tick = () => {
+      enforceBoundary();
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [isPlaying, enforceBoundary]);
+
+  // Also handle the native timeupdate as fallback
+  const handleTimeUpdate = useCallback(() => {
+    enforceBoundary();
+  }, [enforceBoundary]);
 
   const togglePlayPause = useCallback(() => {
     if (videoRef.current) {
